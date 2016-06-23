@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import RPi.GPIO as GPIO
+import sys 
+reload(sys)
+sys.setdefaultencoding('utf8')
+
+import mcp3008
+import time
+import Adafruit_DHT as dht
+
+import logging
+logger = logging.getLogger('msg')
+hdlr = logging.FileHandler('/home/pi/meetingRoom/msg.log')
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr)
+logger.setLevel(logging.INFO)
+
+pinPIR = 35
+pinDHT22 = 26
+
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(pinPIR ,GPIO.IN)
+
+#Interrupts
+def MOTION(pinPIR):
+	logger.info("Motion Detected!")
+
+GPIO.add_event_detect(pinPIR, GPIO.RISING, callback=MOTION)
+
+try:
+       	while True:
+		statusPIR = GPIO.input(pinPIR)
+
+		adc = mcp3008.MCP3008()
+		logger.info("PIR status: " + str(statusPIR))
+		logger.info("Light #1: " + str(adc.read([mcp3008.CH1]))) # prints raw data [CH0]
+		logger.info("MQ4: " + str(adc.read([mcp3008.CH2]))) # prints raw data [CH0]
+		adc.close()
+
+		h,t = dht.read_retry(dht.DHT22, pinDHT22)
+		logger.info("Temperature:" + str(t))
+		logger.info("Humindity:" + str(h))
+		logger.info("-------------------------------------")
+		time.sleep( 5 )
+
+except Exception,e:
+	print str(e)

@@ -1,0 +1,234 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+APIKEY_MAILGUN = "key-090bdff9e11f02225c3911dd68ae4666"
+API_MAILGUN_DOMAIN = "mg.appflying.net"
+
+import RPi.GPIO as GPIO
+import os, sys, subprocess
+import  requests 
+
+reload(sys)
+sys.setdefaultencoding('utf8')
+
+import mcp3008
+import time
+import Adafruit_DHT as dht
+
+import logging
+logger = logging.getLogger('msg')
+hdlr = logging.FileHandler('/home/pi/monitor/msg.log')
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr)
+logger.setLevel(logging.INFO)
+
+import picamera
+camera = picamera.PiCamera()
+camera.sharpness = 0
+camera.contrast = 0
+camera.brightness = 50
+camera.saturation = 0
+camera.ISO = 0
+camera.video_stabilization = False
+camera.exposure_compensation = 0
+camera.exposure_mode = 'auto'
+camera.meter_mode = 'average'
+camera.awb_mode = 'auto'
+camera.image_effect = 'none'
+camera.color_effects = None
+camera.rotation = 0
+camera.hflip = False
+camera.vflip = True
+camera.crop = (0.0, 0.0, 1.0, 1.0)
+
+PIR_last_pictureTime = time.time()  #上次拍攝相片時間
+PIR_pictures_group_nums = 3 #每次拍攝要拍幾張
+PIR_sleep_PictureAgainPeriod = 3  #休息幾秒再度開始拍攝
+PIR_sleep_take_2_PicturesPeriod = 0.5  #拍攝每張相片的間隔時間
+
+ENV_warning_repeat_period = 60  #相同的警示提示音, 要間隔多少秒再提醒一次
+ENV_lastwarningtime = 0  #上次警示提示音的時間
+
+ENV_checkPeriod = 120  #幾秒要偵測一次溫溼度等環境值
+ENV_lstchecktime = 0  #上次偵測環境值的時間
+
+modeOperation = 0  # 0 -> 儲存目前的運作模式, 一般模式  1 -> 外出模式
+modeSecutirt_waittime = 300  # 180, 300, 600, 900 設定外出模式後. 幾秒後才會開始動作.
+modeSecutiry_starttime = 0  #儲存外出模式的開始時間, 預設在 modeSecutirt_waittime 後才開始動作
+
+
+# Cloudinary ---------------------------
+from cloudinary.uploader import upload
+from cloudinary.utils import cloudinary_url
+from cloudinary.api import delete_resources_by_tag, resources_by_tag
+os.chdir(os.path.join(os.path.dirname(sys.argv[0]), '.'))
+#if os.path.exists('settings.py'):
+#	execfile('settings.py')
+
+def dump_response(response):
+	print("Upload response:")
+	for key in sorted(response.keys()):
+		print("  %s: %s" % (key, response[key]))
+
+def upload_files(filename, width, height, tag, pid):
+	logger.info("--- Upload a local file with custom public ID")
+	response = upload(filename,
+		tags = tag,
+		public_id = pid,
+	)
+	dump_response(response)
+
+	url, options = cloudinary_url(response['public_id'],
+		format = response['format'],
+		width = width,
+		height = height,
+		crop = "fit"
+	)
+	logger.info("Image uploaded to url: " + url)
+
+def send_mailgun(apikey, domainName, toEmail, ccEmail, txtSubject, txtContent):
+	return requests.post(
+		"https://api.mailgun.net/v3/"+domainName+"/messages",
+		auth=("api", apikey),
+		files=[("attachment", open("20160621224549.jpg"))
+			,("attachment", open("20160621224728.jpg"))
+			],
+		data={"from": "HomeMonitor <monitor@"+domainName+">",
+			"to": toEmail,
+			"cc": ccEmail,
+#			"bcc": "bar@example.com",
+			"subject": txtSubject,
+			"text": txtContent
+#			"html": "<html>HTML version of the body</html>"
+			})
+# ---------------------------------------
+
+def lightLED(mode):
+	if mode == 0:	#居家模式
+		GPIO.output(pinLED_BLUE, GPIO.LOW)
+		GPIO.output(pinLED_RED, GPIO.LOW)
+		GPIO.output(pinLED_YELLOW, GPIO.HIGH)
+	elif mode == 1:	# 外出模式
+		GPIO.output(pinLED_BLUE, GPIO.HIGH)
+		GPIO.output(pinLED_RED, GPIO.LOW)
+		GPIO.output(pinLED_YELLOW, GPIO.LOW)
+	else:
+		GPIO.output(pinLED_BLUE, GPIO.LOW)
+		GPIO.output(pinLED_RED, GPIO.HIGH)
+		GPIO.output(pinLED_YELLOW, GPIO.HIGH)
+
+def playWAV(wavFile):
+	os.system('omxplayer --no-osd ' + wavFile)
+
+
+pinPIR = 35
+pinDHT22 = 26
+pinLED_RED = 38
+pinLED_BLUE = 36
+pinLED_YELLOW = 40
+pinBTN_Security = 32
+
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(pinBTN_Security, GPIO.IN, pull_up_down=GPIO.PUD_UP) #使用內建的上拉電阻
+
+GPIO.setup(pinPIR ,GPIO.IN)
+GPIO.setup(pinLED_RED ,GPIO.OUT)
+GPIO.setup(pinLED_YELLOW ,GPIO.OUT)
+GPIO.setup(pinLED_BLUE ,GPIO.OUT)
+
+#Interrupts
+def MOTION(pinPIR):
+	global PIR_last_pictureTime, modeOperation, modeSecutiry_starttime, ENV_lastwarningtime, ENV_warning_repeat_period
+
+	#print ("Security mode will start after " + str(modeSecutirt_waittime - (time.time()-modeSecutiry_starttime)))
+	if modeOperation==1 and modeSecutiry_starttime>0 and ((time.time()-modeSecutiry_starttime)>modeSecutirt_waittime):
+		logger.info("Motion Detected!")
+		captureTime = time.localtime()
+		print("PIR Camera eriod: "+ str( (time.time()-PIR_last_pictureTime))*60 )
+
+		if ((time.time()-PIR_last_pictureTime))>PIR_sleep_PictureAgainPeriod:
+
+			#picture_DateTag = time.strftime("%Y-%m-%d %H:%M:%S", captureTime)
+			picture_filename = time.strftime("%Y%m%d%H%M%S", captureTime)
+			camera.capture(picture_filename + '.jpg')
+
+			time.sleep(PIR_sleep_take_2_PicturesPeriod)
+			upload_files(picture_filename + '.jpg', 250, 250, "PIR", picture_filename)
+	
+			send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報-有人入侵", "PIR偵測到有人進入客廳, 已立即拍攝相片。")
+
+			PIR_last_pictureTime = captureTime
+	else:
+		if modeOperation==1:
+			if ((time.time()-ENV_lastwarningtime))>ENV_warning_repeat_period:
+				tmpTime = (modeSecutirt_waittime - (time.time()-modeSecutiry_starttime))/60
+				print("In TIME: " + str(tmpTime) )
+
+				if tmpTime<=1:
+					playWAV("wav/startIn1min.wav")
+				elif tmpTime<=3 and tmpTime>1:
+					playWAV("wav/startIn3min.wav")
+				elif tmpTime<=5 and tmpTime>3:
+					playWAV("wav/startIn5min.wav")
+				elif tmpTime<=10 and tmpTime>5:
+					playWAV("wav/startIn10min.wav")
+				elif tmpTime<=30 and tmpTime>10:
+					playWAV("wav/startIn30min.wav")
+				elif tmpTime>30:
+					playWAV("wav/startAfter30min.wav")
+
+				ENV_lastwarningtime = time.time()
+
+
+def btn_Security(pinBTN_Security):
+	global modeOperation, modeSecutiry_starttime
+
+	if modeOperation == 0:
+		modeOperation = 1
+		modeSecutiry_starttime = time.time()
+		os.system('omxplayer --no-osd wav/mode1.wav')
+	else:
+		modeOperation = 0
+		modeSecutiry_starttime = 0
+		os.system('omxplayer --no-osd wav/mode0.wav')
+
+	lightLED(modeOperation)
+	print('Button Pressed, mode change to ' + str(modeOperation))
+	time.sleep( 3 )
+		
+
+GPIO.add_event_detect(pinPIR, GPIO.RISING, callback=MOTION)
+GPIO.add_event_detect(pinBTN_Security, GPIO.FALLING, callback=btn_Security)
+
+GPIO.output(pinLED_BLUE, GPIO.HIGH)
+GPIO.output(pinLED_RED, GPIO.LOW)
+GPIO.output(pinLED_YELLOW, GPIO.HIGH)
+
+try:
+       	while True:
+		#stateBTN_Security = GPIO.input(pinBTN_Security)
+		#if stateBTN_Security == False:
+	#		print('Button Pressed')
+
+		if (time.time()-ENV_lstchecktime)>ENV_checkPeriod:		
+			statusPIR = GPIO.input(pinPIR)
+	
+			adc = mcp3008.MCP3008()
+			logger.info("Mode: " + str(modeOperation))
+			logger.info("PIR status: " + str(statusPIR))
+			logger.info("Light #1: " + str(adc.read([mcp3008.CH1]))) # prints raw data [CH0]
+			logger.info("MQ4: " + str(adc.read([mcp3008.CH2]))) # prints raw data [CH0]
+			adc.close()
+
+			h,t = dht.read_retry(dht.DHT22, pinDHT22)
+			logger.info("Temperature:" + str(t))
+			logger.info("Humindity:" + str(h))
+			logger.info("-------------------------------------")
+
+			ENV_lstchecktime = time.time()
+
+
+except Exception,e:
+	print str(e)
