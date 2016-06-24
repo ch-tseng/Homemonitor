@@ -5,8 +5,9 @@ APIKEY_MAILGUN = "key-090bdff9e11f02225c3911dd68ae4666"
 API_MAILGUN_DOMAIN = "mg.appflying.net"
 
 import RPi.GPIO as GPIO
-import os, sys, subprocess
+import os, sys
 import  requests 
+from subprocess import call
 
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -392,7 +393,9 @@ def lightLED(mode):
 		GPIO.output(pinLED_YELLOW, GPIO.HIGH)
 
 def playWAV(wavFile):
-	os.system('omxplayer --no-osd ' + wavFile)
+	logger.info("PLAY WAV: "+wavFile)
+	#call('omxplayer --no-osd ' + wavFile)
+	call(["omxplayer","--no-osd",wavFile])
 
 
 pinPIR = 35
