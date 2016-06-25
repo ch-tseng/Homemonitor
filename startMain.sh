@@ -8,5 +8,6 @@ ps -ef | grep -v grep | grep start.py
 
 if [ $? -eq 1 ]
 then
+    sleep 60
     sudo reboot
 fi

@@ -14,7 +14,7 @@ PIR_sleep_take_2_PicturesPeriod = 0.5  #拍攝每張相片的間隔時間
 modeSecutirt_waittime = 300  # 180, 300, 600, 900 設定外出模式後. 幾秒後才會開始動作.
 #-for all mode ------------------------------
 ENV_checkPeriod = 300  #幾秒要偵測一次溫溼度等環境值
-
+ENV_takePicture_period = 60 * 60  #居家模式下，每隔幾秒拍一次
 
 ##蘋果日報-財經總覽 "http://www.appledaily.com.tw/rss/newcreate/kind/sec/type/8"
 ##蘋果日報-頭條 "http://www.appledaily.com.tw/rss/newcreate/kind/sec/type/1077"
@@ -119,6 +119,8 @@ modeSecutiry_starttime = 0  #儲存外出模式的開始時間, 預設在 modeSe
 lastHourlySchedule = 999 #上次每小時固定執行工作的執行時間(小時)
 btn_secutiry_lastclicktime = 0   #上次按按鈕的時間, 以避免多次觸發
 
+lastENV_takePicture_period = time.time()  # 居家模式下，上次每隔幾秒拍一次的時間
+
 #===Functions===========================================================
 
 def is_json(myjson):
@@ -128,7 +130,22 @@ def is_json(myjson):
 		return False
 	return True
 
-def send_mailgun(apikey, domainName, imagefile1, imagefile2, imagefile3, toEmail, ccEmail, txtSubject, txtContent):
+def send_mailgun(apikey, domainName, imagefile, toEmail, ccEmail, txtSubject, txtContent):
+        return requests.post(
+                "https://api.mailgun.net/v3/"+domainName+"/messages",
+                auth=("api", apikey),
+                files=[("attachment", open(imagefile))
+                        ],
+                data={"from": "HomeMonitor <monitor@"+domainName+">",
+                        "to": toEmail,
+                        "cc": ccEmail,
+#                       "bcc": "bar@example.com",
+                        "subject": txtSubject,
+                        "text": txtContent
+#                       "html": "<html>HTML version of the body</html>"
+                        })
+
+def send_mailgun_multi(apikey, domainName, imagefile1, imagefile2, imagefile3, toEmail, ccEmail, txtSubject, txtContent):
 	return requests.post(
 		"https://api.mailgun.net/v3/"+domainName+"/messages",
 		auth=("api", apikey),
@@ -219,8 +236,12 @@ def lightLED(mode):
 		GPIO.output(pinLED_BLUE, GPIO.HIGH)
 		GPIO.output(pinLED_RED, GPIO.LOW)
 		GPIO.output(pinLED_YELLOW, GPIO.LOW)
+	elif mode == 6: # 拍照
+                GPIO.output(pinLED_BLUE, GPIO.LOW)
+                GPIO.output(pinLED_RED, GPIO.HIGH)
+                GPIO.output(pinLED_YELLOW, GPIO.LOW)
 	else:
-		GPIO.output(pinLED_BLUE, GPIO.LOW)
+		GPIO.output(pinLED_BLUE, GPIO.HIGH)
 		GPIO.output(pinLED_RED, GPIO.HIGH)
 		GPIO.output(pinLED_YELLOW, GPIO.HIGH)
 
@@ -413,6 +434,20 @@ def EnvWarning(T, H, MQ4):
 def playTV():
 	tvfile = random.choice(tvList)
 	playWAV(tvfile)
+
+def takePicture(typePIC, subject, content):
+	global modeOperation
+
+	lightLED(6)
+	captureTime = time.localtime()
+	picture_date = time.strftime("%H點%M分%S秒", captureTime)
+	picture_filename = time.strftime("%Y%m%d%H%M%S", captureTime) + '.jpg'
+	camera.capture(picture_filename)
+	upload_files(picture_filename, 250, 250, typePIC, picture_filename)
+	#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
+	send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "拍攝時間" + picture_date + ": " + subject, "拍攝相片時間為" + picture_date + "\n\n" + content)
+
+	lightLED(modeOperation)	
 	
 #for Interrupts--------------------------
 def MOTION(pinPIR):
@@ -422,33 +457,24 @@ def MOTION(pinPIR):
 	if modeOperation==1 and modeSecutiry_starttime>0 and ((time.time()-modeSecutiry_starttime)>modeSecutirt_waittime):
 		logger.info("Motion Detected!")
 		captureTime = time.localtime()
+		picIndex = time.strftime("%Y%m%d%H%M%S", captureTime)
 
+		lightLED(6)
 		if ((time.time()-PIR_last_pictureTime))>PIR_sleep_PictureAgainPeriod:
+			playWAV("wav/warning/warning1.wav")
 
-			picture_date = time.strftime("%H點%M分%S秒", captureTime)
-			picture_filename1 = time.strftime("%Y%m%d%H%M%S", captureTime) + '1.jpg'
-			camera.capture(picture_filename1)
+			takePicture("PIR-"+picIndex+"-1", "PIR偵測", "PIR偵測到有人進入客廳！")			
 			time.sleep(PIR_sleep_take_2_PicturesPeriod)
-			upload_files(picture_filename1, 250, 250, "PIR_1", picture_filename1)
+			takePicture("PIR-"+picIndex+"-2", "PIR偵測", "PIR偵測到有人進入客廳！")
+			time.sleep(PIR_sleep_take_2_PicturesPeriod, "PIR偵測", "PIR偵測到有人進入客廳！")
+			takePicture("PIR-"+picIndex+"-3")
 
-			picture_date = time.strftime("%H點%M分%S秒", captureTime)
-			picture_filename2 = time.strftime("%Y%m%d%H%M%S", captureTime) + '2.jpg'
-			camera.capture(picture_filename2)
-			time.sleep(PIR_sleep_take_2_PicturesPeriod)
-			upload_files(picture_filename2, 250, 250, "PIR_2", picture_filename2)
-
-			picture_date = time.strftime("%H點%M分%S秒", captureTime)
-			picture_filename3 = time.strftime("%Y%m%d%H%M%S", captureTime) + '3.jpg'
-			camera.capture(picture_filename3)
-			time.sleep(PIR_sleep_take_2_PicturesPeriod)
-			upload_files(picture_filename3, 250, 250, "PIR_3", picture_filename3)
-	
-			send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename1, picture_filename2 , picture_filename3,  "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
+			#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename1, picture_filename2 , picture_filename3,  "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
 
 			playWAV("wav/warning/warning1.wav")
 
 			PIR_last_pictureTime = time.time()
-
+			lightLED(modeOperation)
 	else:
 		if modeOperation==1:
 			if ((time.time()-ENV_lastwarningtime))>ENV_warning_repeat_period:
@@ -565,6 +591,9 @@ try:
 							#	playWAV("wav/news/n1.wav")	#下面為您播報重點新聞提要
 							#	newsRead(NEWSREPORT_URL, NEWSREPORT_SPEAKER, 10)
 						
+							if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
+								takePicture("Home", "定時攝影", "目前為居家模式。")
+								lastENV_takePicture_period = time.time()
 						
 			if modeOperation==1:
 				#if GPIO.input(pinPIR) == True:
