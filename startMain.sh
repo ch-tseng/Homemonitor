@@ -3,3 +3,10 @@ export CLOUDINARY_URL=cloudinary://735329816927517:_7J6qrTVtRNixIkhixkAicdnLk4@a
 
 cd /home/pi/monitor
 python start.py
+
+ps -ef | grep -v grep | grep start.py
+
+if [ $? -eq 1 ]
+then
+    sudo reboot
+fi

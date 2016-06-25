@@ -11,7 +11,7 @@ from cStringIO import StringIO
 
 def is_json(myjson):
 	try:
-        	json_object = json.loads(myjson)
+		json_object = json.loads(myjson)
         except ValueError, e:
         	return False
         return True
@@ -136,7 +136,7 @@ class TTSspech:
 		        # check if playback has finished
 		 #       clock.tick(30)
 
-	def playVoice(self, voiceFrequency=22050, totalChannels=1):
+	def playVoice(self, voiceFrequency=48000, totalChannels=1):
 		tmpURL = self.resultUrl
 
 		if(tmpURL[-3:]=="wav"):

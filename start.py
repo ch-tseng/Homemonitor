@@ -291,7 +291,7 @@ def read_Weather():
 	speakString = "今天" + str(nowYear) + "年" + number2speakwords(int(nowMonth)) + "月" + number2speakwords(int(nowDay)) + "日  " + number2speakwords(int(nowHour)) + "點" + number2speakwords(int(nowMinute)) + "分  ," + nowWeather + " , " + nowUV + nowAir
 	logger.info(speakString)
 
-	speakWords(speakString, "MCHEN_Bruce", 15600, 0)
+	speakWords(speakString, "MCHEN_Bruce", 48000, 0)
 
 def alarmSensor(nowT, nowH, nowGAS, nowLight ):
 
@@ -489,85 +489,95 @@ def btn_Security(pinBTN_Security):
 		
 #Register----------------------------------------------
 GPIO.add_event_detect(pinPIR, GPIO.RISING, callback=MOTION)
-GPIO.add_event_detect(pinBTN_Security, GPIO.FALLING, callback=btn_Security)
+#GPIO.add_event_detect(pinBTN_Security, GPIO.FALLING, callback=btn_Security)
 
 #Start--------------------------------------------------
 lightLED(modeOperation)
 
 try:
 	while True:
-	
-		dt = list(time.localtime())
-		nowYear = dt[0]
-		nowMonth = dt[1]
-		nowDay = dt[2]
-		nowHour = dt[3]
-		nowMinute = dt[4]
 
-		print("lastHourlySchedule=" + str(lastHourlySchedule) + " / nowHour=" + str(nowHour))
+		#print "PIR:" + str(GPIO.input(pinPIR))
 
-		if lastHourlySchedule==999:
-			playWAV("wav/welcome/welcome1.wav") #您好，歡迎使用居家安全時鐘。按鈕 可切換居家或外出模式。
-			lastHourlySchedule = nowHour
-		
-		#Environment information
-		if (time.time()-ENV_lstchecktime)>ENV_checkPeriod:		
-			statusPIR = GPIO.input(pinPIR)		
-			adc = mcp3008.MCP3008()
-			vLight = adc.read([mcp3008.CH1])
-			vMQ4 = adc.read([mcp3008.CH2])
-			
-			logger.info("Time: " + str(nowYear) + '/' + str(nowMonth) + '/' + str(nowDay) + ' ' + str(nowHour) + ':' + str(nowMinute))
-			logger.info("Mode: " + str(modeOperation))
-			logger.info("PIR status: " + str(statusPIR))
-			logger.info("Light #1: " + str(vLight[0])) # prints raw data [CH0]
-			logger.info("MQ4: " + str(vMQ4[0])) # prints raw data [CH0]
-			adc.close()
+		if GPIO.input(pinBTN_Security) == False:
+			btn_Security(pinPIR)
 
-			h,t = dht.read_retry(dht.DHT22, pinDHT22)
-			logger.info("Temperature:" + str(int(t)))
-			logger.info("Humindity:" + str(int(h)))
-			logger.info("-------------------------------------")
+		else:
+			dt = list(time.localtime())
+			nowYear = dt[0]
+			nowMonth = dt[1]
+			nowDay = dt[2]
+			nowHour = dt[3]
+			nowMinute = dt[4]
 
-			ENV_lstchecktime = time.time()
-			
-		if modeOperation==0:
-			#異常警示
-			if t>40:
-				EnvWarning(int(t), int(h),int(vMQ4[0]))
-			else:		
-				if nowHour>7 and nowHour<24:
-					if lastHourlySchedule!=nowHour:
-						lastHourlySchedule = nowHour
+			#print("lastHourlySchedule=" + str(lastHourlySchedule) + " / nowHour=" + str(nowHour))
 
-						#靜心語
-						if nowHour==7 or nowHour==12 or nowHour==18 or nowHour==21:
-							read_Sentence1()
-									
-						#整點報時					
-						timeTell(nowHour, nowMinute)
-						
-						#室內溫度狀況告知					
-						alarmSensor(int(t), int(h), int(vLight[0]), int(vMQ4[0]) )
-						
-						
-						#室外氣象
-						if nowHour==7 or nowHour==10 or nowHour==13 or nowHour==15:
-							read_Weather()
-						
-						#if nowHour==7 or nowHour==12 or nowHour==18:
-						#	playWAV("wav/news/n1.wav")	#下面為您播報重點新聞提要
-						#	newsRead(NEWSREPORT_URL, NEWSREPORT_SPEAKER, 10)
-						
-						
-		if modeOperation==1:
-			#異常警示
-			if t>40:
-				EnvWarning(int(t), int(h),int(vMQ4[0]))
-
-			#特定時間播放TV節目聲音
-			if lastHourlySchedule!=nowHour:
+			if lastHourlySchedule==999:
+				playWAV("wav/welcome/welcome1.wav") #您好，歡迎使用居家安全時鐘。按鈕 可切換居家或外出模式。
 				lastHourlySchedule = nowHour
+		
+			#Environment information
+			if (time.time()-ENV_lstchecktime)>ENV_checkPeriod:		
+				statusPIR = GPIO.input(pinPIR)		
+				adc = mcp3008.MCP3008()
+				vLight = adc.read([mcp3008.CH1])
+				vMQ4 = adc.read([mcp3008.CH2])
+			
+				logger.info("Time: " + str(nowYear) + '/' + str(nowMonth) + '/' + str(nowDay) + ' ' + str(nowHour) + ':' + str(nowMinute))
+				logger.info("Mode: " + str(modeOperation))
+				logger.info("PIR status: " + str(statusPIR))
+				logger.info("Light #1: " + str(vLight[0])) # prints raw data [CH0]
+				logger.info("MQ4: " + str(vMQ4[0])) # prints raw data [CH0]
+				adc.close()
+
+				h,t = dht.read_retry(dht.DHT22, pinDHT22)
+				logger.info("Temperature:" + str(int(t)))
+				logger.info("Humindity:" + str(int(h)))
+				logger.info("-------------------------------------")
+
+				ENV_lstchecktime = time.time()
+			
+			if modeOperation==0:
+				#異常警示
+				if t>40:
+					EnvWarning(int(t), int(h),int(vMQ4[0]))
+				else:		
+					if nowHour>7 and nowHour<24:
+						if lastHourlySchedule!=nowHour:
+							lastHourlySchedule = nowHour
+
+							#靜心語
+							if nowHour==7 or nowHour==12 or nowHour==18 or nowHour==21:
+								read_Sentence1()
+										
+							#整點報時					
+							timeTell(nowHour, nowMinute)
+							
+							#室內溫度狀況告知					
+							alarmSensor(int(t), int(h), int(vLight[0]), int(vMQ4[0]) )
+							
+							
+							#室外氣象
+							if nowHour==7 or nowHour==10 or nowHour==13 or nowHour==15:
+								read_Weather()
+							
+							#if nowHour==7 or nowHour==12 or nowHour==18:
+							#	playWAV("wav/news/n1.wav")	#下面為您播報重點新聞提要
+							#	newsRead(NEWSREPORT_URL, NEWSREPORT_SPEAKER, 10)
+						
+						
+			if modeOperation==1:
+				#if GPIO.input(pinPIR) == True:
+				#	MOTION(pinPIR)
+
+				#else:
+				#異常警示
+				if t>40:
+					EnvWarning(int(t), int(h),int(vMQ4[0]))
+
+				#特定時間播放TV節目聲音
+				if lastHourlySchedule!=nowHour:
+					lastHourlySchedule = nowHour
 
 				if nowHour==8 or nowHour==12 or nowHour==18:
 					playTV()
