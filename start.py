@@ -122,7 +122,7 @@ btn_secutiry_lastclicktime = 0   #上次按按鈕的時間, 以避免多次觸�
 lastENV_takePicture_period = time.time()  # 居家或外出模式下，上次每隔幾秒拍一次的時間
 lastPlayTV = time.time()  #上次播放TV聲的時闁
 
-lastPIRfounded = 0 #上次PIR發現到人的時間
+lastPIRfounded = "" #上次PIR發現到人的時間
 #===Functions===========================================================
 
 def is_json(myjson):
@@ -556,69 +556,61 @@ try:
 				adc = mcp3008.MCP3008()
 				vLight = adc.read([mcp3008.CH1])
 				vMQ4 = adc.read([mcp3008.CH2])
+				adc.close()
 
 				h,t = dht.read_retry(dht.DHT22, pinDHT22)
 
 				statusContent = ""
 
-				statusContent += "偵測時間：" + str(nowYear) + '/' + str(nowMonth) + '/' + str(nowDay) + ' ' + str(nowHour) + ':' + str(nowMinute))
+				statusContent = statusContent + '偵測時間：' + str(nowYear) + '/' + str(nowMonth) + '/' + str(nowDay) + ' ' + str(nowHour) + ':' + str(nowMinute)
 				if modeOperation==1:
-					tatusContent += "\n\n 目前為：外出模式"
+					tatusContent = statusContent + "\n\n 目前為：外出模式"
 				else:
-					tatusContent += "\n\n 目前為：居家模式"
+					tatusContent = statusContent + "\n\n 目前為：居家模式"
 
 				if lastPIRfounded!="":
-					statusContent += "\n 上次PIR偵測有人的時間：" + lastPIRfounded
+					statusContent = statusContent + "\n 上次PIR偵測有人的時間：" + lastPIRfounded
 
 				if vLight[0]<5:
-					statusContent += "\n 目前客聽未開燈，為全暗的狀態，照度為：" + str(vLight[0])
+					statusContent = statusContent + "\n 目前客聽未開燈，為全暗的狀態，照度為：" + str(vLight[0])
 				elif vLight[0]<20 and vLight[0]>=5:
-					statusContent += "\n 目前客聽可能未開燈，相當的暗，照度為：" + str(vLight[0])
+					statusContent = statusContent + "\n 目前客聽可能未開燈，相當的暗，照度為：" + str(vLight[0])
 				elif vLight[0]<50 and vLight[0]>=20:
-					statusContent += "\n 目前客聽微亮，有些光亮，照度為：" + str(vLight[0])
+					statusContent = statusContent + "\n 目前客聽微亮，有些光亮，照度為：" + str(vLight[0])
 				elif vLight[0]<70 and vLight[0]>=50:
-                                        statusContent += "\n 目前客聽為正常亮度，照度為：" + str(vLight[0])
+                                        statusContent = statusContent + "\n 目前客聽為正常亮度，照度為：" + str(vLight[0])
 				elif vLight[0]>=70:
-                                        statusContent += "\n 目前客聽很亮，照度為：" + str(vLight[0])
+                                        statusContent = statusContent + "\n 目前客聽很亮，照度為：" + str(vLight[0])
 
 				if vMQ4[0]<75:
-					statusContent += "\n 沒有煤氣或瓦斯外洩的疑慮，請安心。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
+					statusContent = statusContent + "\n 沒有煤氣或瓦斯外洩的疑慮，請安心。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
 				elif vMQ4[0]>=75 and vMQ4[0]<100:
-					statusContent += "\n 請注意，空氣的煤氣指數稍高，請注意煤氣或瓦斯是否有外洩可能。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
+					statusContent = statusContent + "\n 請注意，空氣的煤氣指數稍高，請注意煤氣或瓦斯是否有外洩可能。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
 				elif vMQ4[0]>=100:
-                                        statusContent += "\n 注意注意，空氣的煤氣指數偏高，請檢查煤氣或瓦斯是否有外洩。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
+                                        statusContent = statusContent + "\n 注意注意，空氣的煤氣指數偏高，請檢查煤氣或瓦斯是否有外洩。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
 
 				if t<20:
-					statusContent += "\n 客聽溫度目前為" + str(int(t)) + "度C，有點寒冷。"
+					statusContent = statusContent + "\n 客聽溫度目前為" + str(int(t)) + "度C，有點寒冷。"
 				elif t<30 and t>=20:
-					statusContent += "\n 客聽溫度目前為" + str(int(t)) + "度C，有些涼爽。"
+					statusContent = statusContent + "\n 客聽溫度目前為" + str(int(t)) + "度C，有些涼爽。"
 				elif t<35 and t>=30:
-	                                statusContent += "\n 客聽溫度目前為" + str(int(t)) + "度C，有些悶熱。"
+	                                statusContent = statusContent + "\n 客聽溫度目前為" + str(int(t)) + "度C，有些悶熱。"
 				elif t>=35:
-                                        statusContent += "\n 注意注意，客聽溫度很高，目前為" + str(int(t)) + "度C，請檢查火燭。"
+                                        statusContent = statusContent + "\n 注意注意，客聽溫度很高，目前為" + str(int(t)) + "度C，請檢查火燭。"
 
 				if h<10:
-					statusContent += "\n 客聽溼度目前為" + str(int(t)) + "%，相當乾燥。"
+					statusContent = statusContent + "\n 客聽溼度目前為" + str(int(t)) + "%，相當乾燥。"
 				elif h<30 and h>=10:
-					statusContent += "\n 客聽溼度目前為" + str(int(t)) + "%，稍微乾燥。"
+					statusContent = statusContent + "\n 客聽溼度目前為" + str(int(t)) + "%，稍微乾燥。"
 				elif h<65 and h>=30:
-                                        statusContent += "\n 客聽溼度目前為" + str(int(t)) + "%，溼度在理想的狀態。"
+                                        statusContent = statusContent + "\n 客聽溼度目前為" + str(int(t)) + "%，溼度在理想的狀態。"
 				elif h<90 and h>=65:
-                                        statusContent += "\n 客聽溼度目前為" + str(int(t)) + "%，溼度偏高。"
+                                        statusContent = statusContent + "\n 客聽溼度目前為" + str(int(t)) + "%，溼度偏高。"
 				elif h>=90:
-					tatusContent += "\n 客聽溼度目前為" + str(int(t)) + "%，溼度相當高。"
+					statusContent = statusContent + "\n 客聽溼度目前為" + str(int(t)) + "%，溼度相當高。"
 
 			
-				logger.info("Time: " + str(nowYear) + '/' + str(nowMonth) + '/' + str(nowDay) + ' ' + str(nowHour) + ':' + str(nowMinute))
-				logger.info("Mode: " + str(modeOperation))
-				logger.info("PIR status: " + str(statusPIR))
-				logger.info("Light #1: " + str(vLight[0])) # prints raw data [CH0]
-				logger.info("MQ4: " + str(vMQ4[0])) # prints raw data [CH0]
-				adc.close()
-
-				h,t = dht.read_retry(dht.DHT22, pinDHT22)
-				logger.info("Temperature:" + str(int(t)))
-				logger.info("Humindity:" + str(int(h)))
+				logger.info(statusContent)
 				logger.info("-------------------------------------")
 
 				ENV_lstchecktime = time.time()
@@ -652,7 +644,7 @@ try:
 							#	newsRead(NEWSREPORT_URL, NEWSREPORT_SPEAKER, 10)
 				
 				if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
-					takePicture("Home", "定時攝影", "目前為居家模式。")
+					takePicture("Home", "居家安全定時回報", statusContent)
 					lastENV_takePicture_period = time.time()
 						
 			if modeOperation==1:
@@ -668,7 +660,7 @@ try:
 					lastPlayTV = nowHour
 				
 				if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
-                                        takePicture("Home", "定時攝影", "目前為外出模式")
+                                        takePicture("Home", "居家安全定時回報", statusContent)
                                         lastENV_takePicture_period = time.time()	
 		
 except:
