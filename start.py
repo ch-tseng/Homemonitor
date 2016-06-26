@@ -564,23 +564,23 @@ try:
 
 				statusContent +=  '偵測時間：' + str(nowYear) + '/' + str(nowMonth) + '/' + str(nowDay) + ' ' + str(nowHour) + ':' + str(nowMinute)
 				if modeOperation==1:
-					tatusContent +=  "\n\n 目前為：外出模式"
+					statusContent +=  "\n\n 目前居家安全掛鐘處於[外出模式]"
 				else:
-					tatusContent +=  "\n\n 目前為：居家模式"
+					statusContent +=  "\n\n 目前居家安全掛鐘處於[居家模式]"
 
 				if lastPIRfounded!="":
 					statusContent +=  "\n 上次PIR偵測有人的時間：" + lastPIRfounded
 
 				if vLight[0]<5:
-					statusContent +=  "\n 目前客聽未開燈，為全暗的狀態，照度為：" + str(vLight[0])
+					statusContent +=  "\n 客聽未開燈，為全暗的狀態，照度為：" + str(vLight[0])
 				elif vLight[0]<20 and vLight[0]>=5:
-					statusContent +=  "\n 目前客聽可能未開燈，相當的暗，照度為：" + str(vLight[0])
+					statusContent +=  "\n 客聽可能未開燈，相當的暗，照度為：" + str(vLight[0])
 				elif vLight[0]<50 and vLight[0]>=20:
-					statusContent +=  "\n 目前客聽暗但是微亮，有些亮光，照度為：" + str(vLight[0])
+					statusContent +=  "\n 客聽暗但是微亮，有些亮光，照度為：" + str(vLight[0])
 				elif vLight[0]<70 and vLight[0]>=50:
-                                        statusContent +=  "\n 目前客聽為正常亮度，照度為：" + str(vLight[0])
+                                        statusContent +=  "\n 客聽為正常亮度，照度為：" + str(vLight[0])
 				elif vLight[0]>=70:
-                                        statusContent +=  "\n 目前客聽很亮，照度為：" + str(vLight[0])
+                                        statusContent +=  "\n 客聽很亮，照度為：" + str(vLight[0])
 
 				if vMQ4[0]<110:
 					statusContent +=  "\n 此外，空氣中煤氣指數為" + str(vMQ4[0]) + "，並沒有煤氣或瓦斯外洩的疑慮，請安心。"
