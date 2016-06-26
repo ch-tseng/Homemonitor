@@ -576,38 +576,38 @@ try:
 				elif vLight[0]<20 and vLight[0]>=5:
 					statusContent = statusContent + "\n 目前客聽可能未開燈，相當的暗，照度為：" + str(vLight[0])
 				elif vLight[0]<50 and vLight[0]>=20:
-					statusContent = statusContent + "\n 目前客聽微亮，有些光亮，照度為：" + str(vLight[0])
+					statusContent = statusContent + "\n 目前客聽暗但是微亮，有些亮光，照度為：" + str(vLight[0])
 				elif vLight[0]<70 and vLight[0]>=50:
                                         statusContent = statusContent + "\n 目前客聽為正常亮度，照度為：" + str(vLight[0])
 				elif vLight[0]>=70:
                                         statusContent = statusContent + "\n 目前客聽很亮，照度為：" + str(vLight[0])
 
-				if vMQ4[0]<75:
-					statusContent = statusContent + "\n 沒有煤氣或瓦斯外洩的疑慮，請安心。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
-				elif vMQ4[0]>=75 and vMQ4[0]<100:
-					statusContent = statusContent + "\n 請注意，空氣的煤氣指數稍高，請注意煤氣或瓦斯是否有外洩可能。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
-				elif vMQ4[0]>=100:
-                                        statusContent = statusContent + "\n 注意注意，空氣的煤氣指數偏高，請檢查煤氣或瓦斯是否有外洩。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
+				if vMQ4[0]<110:
+					statusContent = statusContent + "\n 此外，並沒有煤氣或瓦斯外洩的疑慮，請安心。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
+				elif vMQ4[0]>=110 and vMQ4[0]<130:
+					statusContent = statusContent + "\n 此外請注意，空氣的煤氣指數稍高，請注意煤氣或瓦斯是否有外洩可能。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
+				elif vMQ4[0]>=130:
+                                        statusContent = statusContent + "\n 此外，請您特別注意，空氣的煤氣指數偏高，請檢查煤氣或瓦斯是否有外洩。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
 
 				if t<20:
-					statusContent = statusContent + "\n 客聽溫度目前為" + str(int(t)) + "度C，有點寒冷。"
+					statusContent = statusContent + "\n 溫溼度方面，客聽的溫度目前為" + str(int(t)) + "度C，有點寒冷。"
 				elif t<30 and t>=20:
-					statusContent = statusContent + "\n 客聽溫度目前為" + str(int(t)) + "度C，有些涼爽。"
+					statusContent = statusContent + "\n 溫溼度方面，客聽溫度目前為" + str(int(t)) + "度C，有些涼爽。"
 				elif t<35 and t>=30:
-	                                statusContent = statusContent + "\n 客聽溫度目前為" + str(int(t)) + "度C，有些悶熱。"
+	                                statusContent = statusContent + "\n 溫溼度方面，客聽溫度目前為" + str(int(t)) + "度C，有些悶熱。"
 				elif t>=35:
-                                        statusContent = statusContent + "\n 注意注意，客聽溫度很高，目前為" + str(int(t)) + "度C，請檢查火燭。"
+                                        statusContent = statusContent + "\n 溫溼度方面，要請您注意，客聽溫度很高，目前為" + str(int(t)) + "度C，請檢查火燭。"
 
 				if h<10:
-					statusContent = statusContent + "\n 客聽溼度目前為" + str(int(t)) + "%，相當乾燥。"
+					statusContent = statusContent + "\n 至於溼度，目前為" + str(int(t)) + "%，相當乾燥。"
 				elif h<30 and h>=10:
-					statusContent = statusContent + "\n 客聽溼度目前為" + str(int(t)) + "%，稍微乾燥。"
+					statusContent = statusContent + "\n 至於溼度，目前為" + str(int(t)) + "%，稍微乾燥。"
 				elif h<65 and h>=30:
-                                        statusContent = statusContent + "\n 客聽溼度目前為" + str(int(t)) + "%，溼度在理想的狀態。"
+                                        statusContent = statusContent + "\n 至於溼度，目前為" + str(int(t)) + "%，溼度在理想的狀態。"
 				elif h<90 and h>=65:
-                                        statusContent = statusContent + "\n 客聽溼度目前為" + str(int(t)) + "%，溼度偏高。"
+                                        statusContent = statusContent + "\n 至於溼度，目前為" + str(int(t)) + "%，溼度偏高。"
 				elif h>=90:
-					statusContent = statusContent + "\n 客聽溼度目前為" + str(int(t)) + "%，溼度相當高。"
+					statusContent = statusContent + "\n 至於溼度，目前為" + str(int(t)) + "%，溼度相當高。"
 
 			
 				logger.info(statusContent)
