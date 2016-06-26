@@ -573,13 +573,13 @@ try:
 
 				if vLight[0]<5:
 					statusContent +=  "\n 客聽未開燈，為全暗的狀態，照度為：" + str(vLight[0])
-				elif vLight[0]<20 and vLight[0]>=5:
+				elif vLight[0]<15 and vLight[0]>=5:
 					statusContent +=  "\n 客聽可能未開燈，相當的暗，照度為：" + str(vLight[0])
-				elif vLight[0]<50 and vLight[0]>=20:
+				elif vLight[0]<30 and vLight[0]>=15:
 					statusContent +=  "\n 客聽暗但是微亮，有些亮光，照度為：" + str(vLight[0])
-				elif vLight[0]<70 and vLight[0]>=50:
+				elif vLight[0]<50 and vLight[0]>=30:
                                         statusContent +=  "\n 客聽為正常亮度，照度為：" + str(vLight[0])
-				elif vLight[0]>=70:
+				elif vLight[0]>=50:
                                         statusContent +=  "\n 客聽很亮，照度為：" + str(vLight[0])
 
 				if vMQ4[0]<110:
