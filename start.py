@@ -6,15 +6,15 @@ APIKEY_MAILGUN = "key-090bdff9e11f02225c3911dd68ae4666"
 API_MAILGUN_DOMAIN = "mg.appflying.net"
 
 #-for mode 1 ---------------------
-tvList = ["wav/tv/tv1.wav", "wav/tv/tv2.wav", "wav/tv/tv3.wav", "wav/tv/tv4.wav", "wav/tv/tv5.wav", "wav/tv/tv6.wav", "wav/tv/tv7.wav"]
+tvList = ["wav/tv/tv1.mp3", "wav/tv/tv2.mp3", "wav/tv/tv3.mp3", "wav/tv/tv4.mp3", "wav/tv/tv5.mp3", "wav/tv/tv6.mp3", "wav/tv/tv7.mp3"]
 
 PIR_sleep_PictureAgainPeriod = 30  #要休息幾秒再度開始一輪的拍攝
 PIR_sleep_take_2_PicturesPeriod = 0.5  #拍攝每張相片的間隔時間
 
 modeSecutirt_waittime = 300  # 180, 300, 600, 900 設定外出模式後. 幾秒後才會開始動作.
 #-for all mode ------------------------------
-ENV_checkPeriod = 300  #幾秒要偵測一次溫溼度等環境值
-ENV_takePicture_period = 60 * 60  #居家模式下，每隔幾秒拍一次
+ENV_checkPeriod = 60  #幾秒要偵測一次溫溼度等環境值
+ENV_takePicture_period = 60 * 60  #居家或外出模式下，每隔幾秒拍一次
 
 ##蘋果日報-財經總覽 "http://www.appledaily.com.tw/rss/newcreate/kind/sec/type/8"
 ##蘋果日報-頭條 "http://www.appledaily.com.tw/rss/newcreate/kind/sec/type/1077"
@@ -119,8 +119,10 @@ modeSecutiry_starttime = 0  #儲存外出模式的開始時間, 預設在 modeSe
 lastHourlySchedule = 999 #上次每小時固定執行工作的執行時間(小時)
 btn_secutiry_lastclicktime = 0   #上次按按鈕的時間, 以避免多次觸發
 
-lastENV_takePicture_period = time.time()  # 居家模式下，上次每隔幾秒拍一次的時間
+lastENV_takePicture_period = time.time()  # 居家或外出模式下，上次每隔幾秒拍一次的時間
+lastPlayTV = time.time()  #上次播放TV聲的時闁
 
+lastPIRfounded = 0 #上次PIR發現到人的時間
 #===Functions===========================================================
 
 def is_json(myjson):
@@ -433,7 +435,11 @@ def EnvWarning(T, H, MQ4):
 
 def playTV():
 	tvfile = random.choice(tvList)
-	playWAV(tvfile)
+        logger.info("PLAY TV FileV: "+tvfile)
+        #call('omxplayer --no-osd ' + wavFile)
+        call(["omxplayer","--no-osd",tvfile])
+
+
 
 def takePicture(typePIC, subject, content):
 	global modeOperation
@@ -451,12 +457,14 @@ def takePicture(typePIC, subject, content):
 	
 #for Interrupts--------------------------
 def MOTION(pinPIR):
-	global PIR_last_pictureTime, modeOperation, modeSecutiry_starttime, ENV_lastwarningtime, ENV_warning_repeat_period
+	global lastPIRfounded, PIR_last_pictureTime, modeOperation, modeSecutiry_starttime, ENV_lastwarningtime, ENV_warning_repeat_period
+
+	captureTime = time.localtime()
+	lastPIRfounded = ime.strftime("%Y/%m/%d %H:%M:%S", captureTime)
 
 	#print ("Security mode will start after " + str(modeSecutirt_waittime - (time.time()-modeSecutiry_starttime)))
 	if modeOperation==1 and modeSecutiry_starttime>0 and ((time.time()-modeSecutiry_starttime)>modeSecutirt_waittime):
 		logger.info("Motion Detected!")
-		captureTime = time.localtime()
 		picIndex = time.strftime("%Y%m%d%H%M%S", captureTime)
 
 		lightLED(6)
@@ -548,6 +556,58 @@ try:
 				adc = mcp3008.MCP3008()
 				vLight = adc.read([mcp3008.CH1])
 				vMQ4 = adc.read([mcp3008.CH2])
+
+				h,t = dht.read_retry(dht.DHT22, pinDHT22)
+
+				statusContent = ""
+
+				statusContent += "偵測時間：" + str(nowYear) + '/' + str(nowMonth) + '/' + str(nowDay) + ' ' + str(nowHour) + ':' + str(nowMinute))
+				if modeOperation==1:
+					tatusContent += "\n\n 目前為：外出模式"
+				else:
+					tatusContent += "\n\n 目前為：居家模式"
+
+				if lastPIRfounded!="":
+					statusContent += "\n 上次PIR偵測有人的時間：" + lastPIRfounded
+
+				if vLight[0]<5:
+					statusContent += "\n 目前客聽未開燈，為全暗的狀態，照度為：" + str(vLight[0])
+				elif vLight[0]<20 and vLight[0]>=5:
+					statusContent += "\n 目前客聽可能未開燈，相當的暗，照度為：" + str(vLight[0])
+				elif vLight[0]<50 and vLight[0]>=20:
+					statusContent += "\n 目前客聽微亮，有些光亮，照度為：" + str(vLight[0])
+				elif vLight[0]<70 and vLight[0]>=50:
+                                        statusContent += "\n 目前客聽為正常亮度，照度為：" + str(vLight[0])
+				elif vLight[0]>=70:
+                                        statusContent += "\n 目前客聽很亮，照度為：" + str(vLight[0])
+
+				if vMQ4[0]<75:
+					statusContent += "\n 沒有煤氣或瓦斯外洩的疑慮，請安心。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
+				elif vMQ4[0]>=75 and vMQ4[0]<100:
+					statusContent += "\n 請注意，空氣的煤氣指數稍高，請注意煤氣或瓦斯是否有外洩可能。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
+				elif vMQ4[0]>=100:
+                                        statusContent += "\n 注意注意，空氣的煤氣指數偏高，請檢查煤氣或瓦斯是否有外洩。（空氣中煤氣指數為：" + str(vMQ4[0]) + "）"
+
+				if t<20:
+					statusContent += "\n 客聽溫度目前為" + str(int(t)) + "度C，有點寒冷。"
+				elif t<30 and t>=20:
+					statusContent += "\n 客聽溫度目前為" + str(int(t)) + "度C，有些涼爽。"
+				elif t<35 and t>=30:
+	                                statusContent += "\n 客聽溫度目前為" + str(int(t)) + "度C，有些悶熱。"
+				elif t>=35:
+                                        statusContent += "\n 注意注意，客聽溫度很高，目前為" + str(int(t)) + "度C，請檢查火燭。"
+
+				if h<10:
+					statusContent += "\n 客聽溼度目前為" + str(int(t)) + "%，相當乾燥。"
+				elif h<30 and h>=10:
+					statusContent += "\n 客聽溼度目前為" + str(int(t)) + "%，稍微乾燥。"
+				elif h<65 and h>=30:
+                                        statusContent += "\n 客聽溼度目前為" + str(int(t)) + "%，溼度在理想的狀態。"
+				elif h<90 and h>=65:
+                                        statusContent += "\n 客聽溼度目前為" + str(int(t)) + "%，溼度偏高。"
+				elif h>=90:
+					tatusContent += "\n 客聽溼度目前為" + str(int(t)) + "%，溼度相當高。"
+
 			
 				logger.info("Time: " + str(nowYear) + '/' + str(nowMonth) + '/' + str(nowDay) + ' ' + str(nowHour) + ':' + str(nowMinute))
 				logger.info("Mode: " + str(modeOperation))
@@ -590,27 +650,26 @@ try:
 							#if nowHour==7 or nowHour==12 or nowHour==18:
 							#	playWAV("wav/news/n1.wav")	#下面為您播報重點新聞提要
 							#	newsRead(NEWSREPORT_URL, NEWSREPORT_SPEAKER, 10)
-						
-							if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
-								takePicture("Home", "定時攝影", "目前為居家模式。")
-								lastENV_takePicture_period = time.time()
+				
+				if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
+					takePicture("Home", "定時攝影", "目前為居家模式。")
+					lastENV_takePicture_period = time.time()
 						
 			if modeOperation==1:
-				#if GPIO.input(pinPIR) == True:
-				#	MOTION(pinPIR)
-
-				#else:
+				#logger.info("Enter modeOperation=1")
 				#異常警示
 				if t>40:
 					EnvWarning(int(t), int(h),int(vMQ4[0]))
 
-				#特定時間播放TV節目聲音
-				if lastHourlySchedule!=nowHour:
-					lastHourlySchedule = nowHour
-
-				if nowHour==8 or nowHour==12 or nowHour==18:
+				#播放TV聲
+				if lastPlayTV!=nowHour and (nowHour==8 or nowHour==17 or nowHour==18):
+					logger.info("PLAY TV SOUND.")
 					playTV()
-					
+					lastPlayTV = nowHour
+				
+				if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
+                                        takePicture("Home", "定時攝影", "目前為外出模式")
+                                        lastENV_takePicture_period = time.time()	
 		
 except:
 	print("Unexpected error:", sys.exc_info()[0])
