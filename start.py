@@ -599,15 +599,15 @@ try:
                                         statusContent = statusContent + "\n 溫溼度方面，要請您注意，客聽溫度很高，目前為" + str(int(t)) + "度C，請檢查火燭。"
 
 				if h<10:
-					statusContent = statusContent + "\n 至於溼度，目前為" + str(int(t)) + "%，相當乾燥。"
+					statusContent = statusContent + "溼度目前為" + str(int(t)) + "%，客廳的空氣相當乾燥。"
 				elif h<30 and h>=10:
-					statusContent = statusContent + "\n 至於溼度，目前為" + str(int(t)) + "%，稍微乾燥。"
+					statusContent = statusContent + "溼度目前為" + str(int(t)) + "%，客廳的空氣稍微乾燥。"
 				elif h<65 and h>=30:
-                                        statusContent = statusContent + "\n 至於溼度，目前為" + str(int(t)) + "%，溼度在理想的狀態。"
+                                        statusContent = statusContent + "溼度目前為" + str(int(t)) + "%，客廳的空氣溼度在理想的狀態。"
 				elif h<90 and h>=65:
-                                        statusContent = statusContent + "\n 至於溼度，目前為" + str(int(t)) + "%，溼度偏高。"
+                                        statusContent = statusContent + "溼度目前為" + str(int(t)) + "%，客廳的空氣溼度偏高。"
 				elif h>=90:
-					statusContent = statusContent + "\n 至於溼度，目前為" + str(int(t)) + "%，溼度相當高。"
+					statusContent = statusContent + "溼度目前為" + str(int(t)) + "%，客廳的空氣溼度相當高。"
 
 			
 				logger.info(statusContent)
