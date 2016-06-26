@@ -520,13 +520,34 @@ def btn_Security(pinBTN_Security):
 		lightLED(modeOperation)
 		logger.info('Button Pressed, mode change to ' + str(modeOperation))
 		btn_secutiry_lastclicktime = time.time()
+
+		fo = open("finalStatus", "wb")
+		fo.write(str(modeOperation))
+		fo.close()
 		
 #Register----------------------------------------------
 GPIO.add_event_detect(pinPIR, GPIO.RISING, callback=MOTION)
 #GPIO.add_event_detect(pinBTN_Security, GPIO.FALLING, callback=btn_Security)
 
 #Start--------------------------------------------------
-lightLED(modeOperation)
+
+try:
+	fo = open("finalStatus", "r+")
+	strMode = fo.read()
+	fo.close()
+	logger.info("Status read from the file : " + strMode)
+except:
+	fo = open("finalStatus", "wb")
+        fo.write(str(modeOperation))
+        fo.close()
+
+if str=="1":
+	modeOperation = 1
+	lightLED(modeOperation)
+else:
+	modeOperation = 0
+	lightLED(modeOperation)
+
 
 try:
 	while True:
