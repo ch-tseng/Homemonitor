@@ -460,7 +460,7 @@ def MOTION(pinPIR):
 	global lastPIRfounded, PIR_last_pictureTime, modeOperation, modeSecutiry_starttime, ENV_lastwarningtime, ENV_warning_repeat_period
 
 	captureTime = time.localtime()
-	lastPIRfounded = ime.strftime("%Y/%m/%d %H:%M:%S", captureTime)
+	lastPIRfounded = time.strftime("%Y/%m/%d %H:%M:%S", captureTime)
 
 	#print ("Security mode will start after " + str(modeSecutirt_waittime - (time.time()-modeSecutiry_starttime)))
 	if modeOperation==1 and modeSecutiry_starttime>0 and ((time.time()-modeSecutiry_starttime)>modeSecutirt_waittime):
@@ -474,7 +474,7 @@ def MOTION(pinPIR):
 			takePicture("PIR-"+picIndex+"-1", "PIR偵測", "PIR偵測到有人進入客廳！")			
 			time.sleep(PIR_sleep_take_2_PicturesPeriod)
 			takePicture("PIR-"+picIndex+"-2", "PIR偵測", "PIR偵測到有人進入客廳！")
-			time.sleep(PIR_sleep_take_2_PicturesPeriod, "PIR偵測", "PIR偵測到有人進入客廳！")
+			time.sleep(PIR_sleep_take_2_PicturesPeriod)
 			takePicture("PIR-"+picIndex+"-3")
 
 			#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename1, picture_filename2 , picture_filename3,  "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
@@ -599,15 +599,15 @@ try:
                                         statusContent +=  "\n 溫溼度方面，要請您注意，客聽溫度很高，目前為" + str(int(t)) + "度C，請檢查火燭。"
 
 				if h<10:
-					statusContent +=  "溼度目前為" + str(int(h)) + "%，客廳的空氣相當乾燥。"
+					statusContent +=  "溼度目前為" + str(int(h)) + "%，空氣相當乾燥。"
 				elif h<30 and h>=10:
-					statusContent +=  "溼度目前為" + str(int(h)) + "%，客廳的空氣稍微乾燥。"
+					statusContent +=  "溼度目前為" + str(int(h)) + "%，空氣稍微乾燥。"
 				elif h<65 and h>=30:
-                                        statusContent +=  "溼度目前為" + str(int(h)) + "%，客廳的空氣溼度在理想的狀態。"
+                                        statusContent +=  "溼度目前為" + str(int(h)) + "%，空氣溼度在理想的狀態。"
 				elif h<90 and h>=65:
-                                        statusContent +=  "溼度目前為" + str(int(h)) + "%，客廳的空氣溼度偏高。"
+                                        statusContent +=  "溼度目前為" + str(int(h)) + "%，空氣溼度偏高。"
 				elif h>=90:
-					statusContent +=  "溼度目前為" + str(int(h)) + "%，客廳的空氣溼度相當高。"
+					statusContent +=  "溼度目前為" + str(int(h)) + "%，空氣溼度相當高。"
 
 			
 				logger.info(statusContent)
@@ -654,7 +654,7 @@ try:
 					EnvWarning(int(t), int(h),int(vMQ4[0]))
 
 				#播放TV聲
-				if lastPlayTV!=nowHour and (nowHour==8 or nowHour==17 or nowHour==18):
+				if lastPlayTV!=nowHour and (nowHour==8 or nowHour==17 or nowHour==22):
 					logger.info("PLAY TV SOUND.")
 					playTV()
 					lastPlayTV = nowHour
