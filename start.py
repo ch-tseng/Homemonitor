@@ -242,7 +242,11 @@ def lightLED(mode):
                 GPIO.output(pinLED_BLUE, GPIO.LOW)
                 GPIO.output(pinLED_RED, GPIO.HIGH)
                 GPIO.output(pinLED_YELLOW, GPIO.LOW)
-	elif mode == 9: # 拍照
+	elif mode == 7: # 說話
+                GPIO.output(pinLED_BLUE, GPIO.HIGH)
+                GPIO.output(pinLED_RED, GPIO.HIGH)
+                GPIO.output(pinLED_YELLOW, GPIO.LOW)
+	elif mode == 9: # 不發光
                 GPIO.output(pinLED_BLUE, GPIO.LOW)
                 GPIO.output(pinLED_RED, GPIO.LOW)
                 GPIO.output(pinLED_YELLOW, GPIO.LOW)
@@ -252,7 +256,7 @@ def lightLED(mode):
 		GPIO.output(pinLED_YELLOW, GPIO.HIGH)
 
 def playWAV(wavFile):
-	lightLED(1)
+	lightLED(7)
 	logger.info("PLAY WAV: "+wavFile)
 	#call('omxplayer --no-osd ' + wavFile)
 	call(["omxplayer","--no-osd",wavFile])
@@ -441,7 +445,7 @@ def EnvWarning(T, H, MQ4):
 		ENV_lastwarningtime = time.time()
 
 def playTV():
-	lightLED(0)
+	lightLED(7)
 	tvfile = random.choice(tvList)
         logger.info("PLAY TV FileV: "+tvfile)
         #call('omxplayer --no-osd ' + wavFile)
@@ -475,7 +479,6 @@ def MOTION(pinPIR):
 		logger.info("Motion Detected!")
 		picIndex = time.strftime("%Y%m%d%H%M%S", captureTime)
 
-		lightLED(6)
 		if ((time.time()-PIR_last_pictureTime))>PIR_sleep_PictureAgainPeriod:
 			playWAV("wav/warning/warning1.wav")
 
@@ -490,7 +493,7 @@ def MOTION(pinPIR):
 			playWAV("wav/warning/warning1.wav")
 
 			PIR_last_pictureTime = time.time()
-			lightLED(modeOperation)
+			lightLED(9)
 	else:
 		if modeOperation==1:
 			if ((time.time()-ENV_lastwarningtime))>ENV_warning_repeat_period:
@@ -520,6 +523,7 @@ def btn_Security(pinBTN_Security):
 			modeOperation = 1
 			lightLED(modeOperation)
 			modeSecutiry_starttime = time.time()
+			#playWAV("wav/mode1.wav")
 			os.system('omxplayer --no-osd wav/mode1.wav')
 			
 		else:
@@ -556,11 +560,13 @@ except:
 if strMode=="0":
 	modeOperation = 0
 	lightLED(modeOperation)
+	os.system('omxplayer --no-osd wav/mode0.wav')	
+	lightLED(9)
 else:
 	modeOperation = 1
 	lightLED(modeOperation)
-
-
+	os.system('omxplayer --no-osd wav/mode1.wav')
+	lightLED(9)
 try:
 	while True:
 
@@ -669,9 +675,12 @@ try:
 							
 							
 							#室外氣象
-							if nowHour==7 or nowHour==10 or nowHour==13 or nowHour==15:
-								read_Weather()
-							
+							if nowHour==11 or nowHour==12 or nowHour==13 or nowHour==14:
+								try:
+									read_Weather()
+								except:
+									print("Unexpected error:", sys.exc_info()[0])
+
 							#if nowHour==7 or nowHour==12 or nowHour==18:
 							#	playWAV("wav/news/n1.wav")	#下面為您播報重點新聞提要
 							#	newsRead(NEWSREPORT_URL, NEWSREPORT_SPEAKER, 10)
@@ -698,4 +707,5 @@ try:
 		
 except:
 	print("Unexpected error:", sys.exc_info()[0])
-	raise
+	logger.info("Unexpected error:", sys.exc_info()[0])
+	#raise
