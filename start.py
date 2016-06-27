@@ -242,15 +242,21 @@ def lightLED(mode):
                 GPIO.output(pinLED_BLUE, GPIO.LOW)
                 GPIO.output(pinLED_RED, GPIO.HIGH)
                 GPIO.output(pinLED_YELLOW, GPIO.LOW)
+	elif mode == 9: # 拍照
+                GPIO.output(pinLED_BLUE, GPIO.LOW)
+                GPIO.output(pinLED_RED, GPIO.LOW)
+                GPIO.output(pinLED_YELLOW, GPIO.LOW)
 	else:
 		GPIO.output(pinLED_BLUE, GPIO.HIGH)
 		GPIO.output(pinLED_RED, GPIO.HIGH)
 		GPIO.output(pinLED_YELLOW, GPIO.HIGH)
 
 def playWAV(wavFile):
+	lightLED(1)
 	logger.info("PLAY WAV: "+wavFile)
 	#call('omxplayer --no-osd ' + wavFile)
 	call(["omxplayer","--no-osd",wavFile])
+	lightLED(9)
 			
 #--Cloudinary--------------------------
 def dump_response(response):
@@ -282,7 +288,7 @@ def read_Sentence1():  #靜心語
 
 
 def read_Weather():
-
+	lightLED(0)
 	dt = list(time.localtime())
 	nowYear = dt[0]
 	nowMonth = dt[1]
@@ -315,6 +321,7 @@ def read_Weather():
 	logger.info(speakString)
 
 	speakWords(speakString, "MCHEN_Bruce", 48000, 0)
+	lightLED(9)
 
 def alarmSensor(nowT, nowH, nowGAS, nowLight ):
 
@@ -434,11 +441,12 @@ def EnvWarning(T, H, MQ4):
 		ENV_lastwarningtime = time.time()
 
 def playTV():
+	lightLED(0)
 	tvfile = random.choice(tvList)
         logger.info("PLAY TV FileV: "+tvfile)
         #call('omxplayer --no-osd ' + wavFile)
         call(["omxplayer","--no-osd",tvfile])
-
+	lightLED(9)
 
 
 def takePicture(typePIC, subject, content):
@@ -453,7 +461,7 @@ def takePicture(typePIC, subject, content):
 	#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
 	send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "拍攝時間" + picture_date + ": " + subject, "拍攝相片時間為" + picture_date + "\n\n" + content)
 
-	lightLED(modeOperation)	
+	lightLED(9)	
 	
 #for Interrupts--------------------------
 def MOTION(pinPIR):
@@ -510,20 +518,23 @@ def btn_Security(pinBTN_Security):
 
 		if modeOperation == 0:
 			modeOperation = 1
+			lightLED(modeOperation)
 			modeSecutiry_starttime = time.time()
 			os.system('omxplayer --no-osd wav/mode1.wav')
+			
 		else:
 			modeOperation = 0
+			lightLED(modeOperation)
 			modeSecutiry_starttime = 0
 			os.system('omxplayer --no-osd wav/mode0.wav')
 
-		lightLED(modeOperation)
 		logger.info('Button Pressed, mode change to ' + str(modeOperation))
 		btn_secutiry_lastclicktime = time.time()
 
 		fo = open("finalStatus", "wb")
 		fo.write(str(modeOperation))
 		fo.close()
+		lightLED(9)
 		
 #Register----------------------------------------------
 GPIO.add_event_detect(pinPIR, GPIO.RISING, callback=MOTION)
@@ -532,6 +543,7 @@ GPIO.add_event_detect(pinPIR, GPIO.RISING, callback=MOTION)
 #Start--------------------------------------------------
 
 try:
+	strMode = "1"
 	fo = open("finalStatus", "r+")
 	strMode = fo.read()
 	fo.close()
@@ -541,11 +553,11 @@ except:
         fo.write(str(modeOperation))
         fo.close()
 
-if str=="1":
-	modeOperation = 1
+if strMode=="0":
+	modeOperation = 0
 	lightLED(modeOperation)
 else:
-	modeOperation = 0
+	modeOperation = 1
 	lightLED(modeOperation)
 
 
@@ -620,15 +632,15 @@ try:
                                         statusContent +=  "\n 溫溼度方面，要請您注意，客聽溫度很高，目前為" + str(int(t)) + "度C，請檢查火燭。"
 
 				if h<10:
-					statusContent +=  "溼度目前為" + str(int(h)) + "%，空氣相當乾燥。"
+					statusContent +=  "溼度是" + str(int(h)) + "%，客聽的空氣相當乾燥。"
 				elif h<30 and h>=10:
-					statusContent +=  "溼度目前為" + str(int(h)) + "%，空氣稍微乾燥。"
+					statusContent +=  "溼度是" + str(int(h)) + "%，客聽的空氣稍微乾燥。"
 				elif h<65 and h>=30:
-                                        statusContent +=  "溼度目前為" + str(int(h)) + "%，空氣溼度在理想的狀態。"
+                                        statusContent +=  "溼度是" + str(int(h)) + "%，客聽的溼度在理想狀態。"
 				elif h<90 and h>=65:
-                                        statusContent +=  "溼度目前為" + str(int(h)) + "%，空氣溼度偏高。"
+                                        statusContent +=  "溼度是" + str(int(h)) + "%，客聽的溼度偏高。"
 				elif h>=90:
-					statusContent +=  "溼度目前為" + str(int(h)) + "%，空氣溼度相當高。"
+					statusContent +=  "溼度是" + str(int(h)) + "%，客聽的溼度相當高。"
 
 			
 				logger.info(statusContent)
