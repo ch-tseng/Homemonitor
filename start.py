@@ -14,7 +14,7 @@ PIR_sleep_take_2_PicturesPeriod = 0.5  #拍攝每張相片的間隔時間
 modeSecutirt_waittime = 300  # 180, 300, 600, 900 設定外出模式後. 幾秒後才會開始動作.
 #-for all mode ------------------------------
 ENV_checkPeriod = 60  #幾秒要偵測一次溫溼度等環境值
-ENV_takePicture_period = 60 * 60  #居家或外出模式下，每隔幾秒拍一次
+ENV_takePicture_period = 1800  #居家或外出模式下，每隔幾秒拍一次
 
 ##蘋果日報-財經總覽 "http://www.appledaily.com.tw/rss/newcreate/kind/sec/type/8"
 ##蘋果日報-頭條 "http://www.appledaily.com.tw/rss/newcreate/kind/sec/type/1077"
@@ -64,11 +64,11 @@ reload(sys)
 sys.setdefaultencoding('utf8')
 
 camera = picamera.PiCamera()
-camera.sharpness = 0
-camera.contrast = 0
+camera.sharpness = 10
+camera.contrast = 10
 camera.brightness = 50
-camera.saturation = 0
-camera.ISO = 0
+camera.saturation = 10
+camera.ISO = 400
 camera.video_stabilization = False
 camera.exposure_compensation = 0
 camera.exposure_mode = 'auto'
@@ -77,7 +77,7 @@ camera.awb_mode = 'auto'
 camera.image_effect = 'none'
 camera.color_effects = None
 camera.rotation = 0
-camera.hflip = False
+camera.hflip = True
 camera.vflip = True
 camera.crop = (0.0, 0.0, 1.0, 1.0)
 
@@ -418,19 +418,19 @@ def EnvWarning(T, H, MQ4):
 		picture_filename1 = time.strftime("%Y%m%d%H%M%S", captureTime) + '1.jpg'
 		camera.capture(picture_filename1)
 		time.sleep(PIR_sleep_take_2_PicturesPeriod)
-		upload_files(picture_filename1, 250, 250, "PIR_1", picture_filename1)
+		upload_files(picture_filename1, 2048, 2048, "PIR_1", picture_filename1)
 
 		picture_date = time.strftime("%H點%M分%S秒", captureTime)
 		picture_filename2 = time.strftime("%Y%m%d%H%M%S", captureTime) + '2.jpg'
 		camera.capture(picture_filename2)
 		time.sleep(PIR_sleep_take_2_PicturesPeriod)
-		upload_files(picture_filename2, 250, 250, "PIR_2", picture_filename2)
+		upload_files(picture_filename2, 2048, 2048, "PIR_2", picture_filename2)
 
 		picture_date = time.strftime("%H點%M分%S秒", captureTime)
 		picture_filename3 = time.strftime("%Y%m%d%H%M%S", captureTime) + '3.jpg'
 		camera.capture(picture_filename3)
 		time.sleep(PIR_sleep_take_2_PicturesPeriod)
-		upload_files(picture_filename3, 250, 250, "PIR_3", picture_filename3)
+		upload_files(picture_filename3, 2048, 2048, "PIR_3", picture_filename3)
 			
 		txtSubject = "環境警報:"
 		txtContent = ""
@@ -453,17 +453,27 @@ def playTV():
 	lightLED(9)
 
 
-def takePicture(typePIC, subject, content):
+def takePicture(typePIC, subject, content, lightNum):
 	global modeOperation
-
 	lightLED(6)
+	camera.ISO = 100
+
+	if lightNum>50 and lightNum<70:
+		camera.ISO = 200
+	elif lightNum<=50 and lightNum>30:
+		camera.ISO = 400
+	elif lightNum<=30 and lightNum>20:
+                camera.ISO = 600
+	elif lightNum<=20:
+                camera.ISO = 800
+
 	captureTime = time.localtime()
 	picture_date = time.strftime("%H點%M分%S秒", captureTime)
 	picture_filename = time.strftime("%Y%m%d%H%M%S", captureTime) + '.jpg'
 	camera.capture(picture_filename)
-	upload_files(picture_filename, 250, 250, typePIC, picture_filename)
+	upload_files(picture_filename, 2048, 2048, typePIC, picture_filename)
 	#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
-	send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "拍攝時間" + picture_date + ": " + subject, "拍攝相片時間為" + picture_date + "\n\n" + content)
+	send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "監測時間" + picture_date + ": " + subject, content + "\n\n 相片拍攝時間為" + picture_date)
 
 	lightLED(9)	
 	
@@ -564,6 +574,7 @@ if strMode=="0":
 	lightLED(9)
 else:
 	modeOperation = 1
+	modeSecutiry_starttime = time.time()
 	lightLED(modeOperation)
 	os.system('omxplayer --no-osd wav/mode1.wav')
 	lightLED(9)
@@ -662,10 +673,11 @@ try:
 					if nowHour>7 and nowHour<24:
 						if lastHourlySchedule!=nowHour:
 							lastHourlySchedule = nowHour
+							read_Sentence1()
 
 							#靜心語
-							if nowHour==7 or nowHour==12 or nowHour==18 or nowHour==21:
-								read_Sentence1()
+							#if nowHour==7 or nowHour==12 or nowHour==18 or nowHour==21:
+							#	read_Sentence1()
 										
 							#整點報時					
 							timeTell(nowHour, nowMinute)
@@ -675,11 +687,11 @@ try:
 							
 							
 							#室外氣象
-							if nowHour==11 or nowHour==12 or nowHour==13 or nowHour==14:
-								try:
-									read_Weather()
-								except:
-									print("Unexpected error:", sys.exc_info()[0])
+							#if nowHour==11 or nowHour==12 or nowHour==13 or nowHour==14:
+							try:
+								read_Weather()
+							except:
+								print("Unexpected error:", sys.exc_info()[0])
 
 							#if nowHour==7 or nowHour==12 or nowHour==18:
 							#	playWAV("wav/news/n1.wav")	#下面為您播報重點新聞提要
