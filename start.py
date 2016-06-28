@@ -16,6 +16,12 @@ modeSecutirt_waittime = 300  # 180, 300, 600, 900 設定外出模式後. 幾秒�
 ENV_checkPeriod = 60  #幾秒要偵測一次溫溼度等環境值
 ENV_takePicture_period = 1800  #居家或外出模式下，每隔幾秒拍一次
 
+speakVolume = "+700"  #音量大小
+localImageSize_w = 1296
+localImageSize_h = 972
+uploadImageSize_w = 720
+uploadImageSize_h = 480
+
 ##蘋果日報-財經總覽 "http://www.appledaily.com.tw/rss/newcreate/kind/sec/type/8"
 ##蘋果日報-頭條 "http://www.appledaily.com.tw/rss/newcreate/kind/sec/type/1077"
 ##聯合報-要聞 "http://udn.com/udnrss/BREAKINGNEWS1.xml"
@@ -68,6 +74,7 @@ camera.sharpness = 10
 camera.contrast = 10
 camera.brightness = 50
 camera.saturation = 10
+camera.resolution = (localImageSize_w, localImageSize_h)
 camera.ISO = 400
 camera.video_stabilization = False
 camera.exposure_compensation = 0
@@ -123,6 +130,7 @@ lastENV_takePicture_period = time.time()  # 居家或外出模式下，上次每
 lastPlayTV = time.time()  #上次播放TV聲的時闁
 
 lastPIRfounded = "" #上次PIR發現到人的時間
+lightDegree = 0  #目前燈光的照明度
 #===Functions===========================================================
 
 def is_json(myjson):
@@ -259,7 +267,7 @@ def playWAV(wavFile):
 	lightLED(7)
 	logger.info("PLAY WAV: "+wavFile)
 	#call('omxplayer --no-osd ' + wavFile)
-	call(["omxplayer","--no-osd",wavFile])
+	call(["omxplayer","--vol", speakVolume, "--no-osd",wavFile])
 	lightLED(9)
 			
 #--Cloudinary--------------------------
@@ -324,10 +332,10 @@ def read_Weather():
 	speakString = "今天" + str(nowYear) + "年" + number2speakwords(int(nowMonth)) + "月" + number2speakwords(int(nowDay)) + "日  " + number2speakwords(int(nowHour)) + "點" + number2speakwords(int(nowMinute)) + "分  ," + nowWeather + " , " + nowUV + nowAir
 	logger.info(speakString)
 
-	speakWords(speakString, "MCHEN_Bruce", 48000, 0)
+	speakWords(speakString, "MCHEN_Bruce", 24000, 0)
 	lightLED(9)
 
-def alarmSensor(nowT, nowH, nowGAS, nowLight ):
+def alarmSensor(nowT, nowH, nowLight, nowGAS ):
 
 	arrayWAVs = []
 	
@@ -399,10 +407,11 @@ def timeTell(hour, minute):
 	arrayWAVs = []
 	
 	arrayWAVs.append("wav/clock/c1.wav")	#目前時刻
-	arrayWAVs.append("wav/number/" + str(hour) + ".wav")
-	arrayWAVs.append("wav/clock/hour.wav")   #點
-	arrayWAVs.append("wav/number/" + str(minute) + ".wav")
-	arrayWAVs.append("wav/clock/minute.wav")   #分
+	#arrayWAVs.append("wav/number/" + str(hour) + ".wav")
+	arrayWAVs.append("wav/hour/" + str(hour) + ".wav")
+	#arrayWAVs.append("wav/clock/hour.wav")   #點
+	#arrayWAVs.append("wav/number/" + str(minute) + ".wav")
+	#arrayWAVs.append("wav/clock/minute.wav")   #分
 
 	for sentence in arrayWAVs:
 		playWAV(sentence)
@@ -449,29 +458,30 @@ def playTV():
 	tvfile = random.choice(tvList)
         logger.info("PLAY TV FileV: "+tvfile)
         #call('omxplayer --no-osd ' + wavFile)
-        call(["omxplayer","--no-osd",tvfile])
+        call(["omxplayer","--vol",speakVolume,"--no-osd",tvfile])
 	lightLED(9)
 
 
-def takePicture(typePIC, subject, content, lightNum):
-	global modeOperation
+def takePicture(typePIC, subject, content):
+	global modeOperation, lightDegree
 	lightLED(6)
 	camera.ISO = 100
 
-	if lightNum>50 and lightNum<70:
+	if lightDegree>50 and lightDegree<70:
 		camera.ISO = 200
-	elif lightNum<=50 and lightNum>30:
+	elif lightDegree<=50 and lightDegree>30:
 		camera.ISO = 400
-	elif lightNum<=30 and lightNum>20:
+	elif lightDegree<=30 and lightDegree>20:
                 camera.ISO = 600
-	elif lightNum<=20:
+	elif lightDegree<=20:
                 camera.ISO = 800
 
 	captureTime = time.localtime()
 	picture_date = time.strftime("%H點%M分%S秒", captureTime)
 	picture_filename = time.strftime("%Y%m%d%H%M%S", captureTime) + '.jpg'
 	camera.capture(picture_filename)
-	upload_files(picture_filename, 2048, 2048, typePIC, picture_filename)
+	logger.info("ISO:" + str(camera.ISO) + " / LightDegree:" + str(lightDegree) + " / A picture was taken: " + picture_filename )
+	upload_files(picture_filename, uploadImageSize_w, uploadImageSize_h, typePIC, picture_filename)
 	#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
 	send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "監測時間" + picture_date + ": " + subject, content + "\n\n 相片拍攝時間為" + picture_date)
 
@@ -480,7 +490,8 @@ def takePicture(typePIC, subject, content, lightNum):
 #for Interrupts--------------------------
 def MOTION(pinPIR):
 	global lastPIRfounded, PIR_last_pictureTime, modeOperation, modeSecutiry_starttime, ENV_lastwarningtime, ENV_warning_repeat_period
-
+	lightLED(modeOperation)
+	#time.sleep(3)	
 	captureTime = time.localtime()
 	lastPIRfounded = time.strftime("%Y/%m/%d %H:%M:%S", captureTime)
 
@@ -496,7 +507,7 @@ def MOTION(pinPIR):
 			time.sleep(PIR_sleep_take_2_PicturesPeriod)
 			takePicture("PIR-"+picIndex+"-2", "PIR偵測", "PIR偵測到有人進入客廳！")
 			time.sleep(PIR_sleep_take_2_PicturesPeriod)
-			takePicture("PIR-"+picIndex+"-3")
+			takePicture("PIR-"+picIndex+"-3", "PIR偵測", "PIR偵測到有人進入客廳！")
 
 			#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename1, picture_filename2 , picture_filename3,  "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
 
@@ -524,6 +535,7 @@ def MOTION(pinPIR):
 					playWAV("wav/startAfter30min.wav")
 
 				ENV_lastwarningtime = time.time()
+	lightLED(9)
 
 def btn_Security(pinBTN_Security):
 	global modeOperation, modeSecutiry_starttime, btn_secutiry_lastclicktime
@@ -534,13 +546,15 @@ def btn_Security(pinBTN_Security):
 			lightLED(modeOperation)
 			modeSecutiry_starttime = time.time()
 			#playWAV("wav/mode1.wav")
-			os.system('omxplayer --no-osd wav/mode1.wav')
+			#os.system('omxplayer --vol ' + speakVolume + ' --no-osd wav/mode1.wav')
+			call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode1.wav"])
 			
 		else:
 			modeOperation = 0
 			lightLED(modeOperation)
 			modeSecutiry_starttime = 0
-			os.system('omxplayer --no-osd wav/mode0.wav')
+			#os.system('omxplayer --vol ' + speakVolume + ' --no-osd wav/mode0.wav')
+			call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode0.wav"])
 
 		logger.info('Button Pressed, mode change to ' + str(modeOperation))
 		btn_secutiry_lastclicktime = time.time()
@@ -570,13 +584,15 @@ except:
 if strMode=="0":
 	modeOperation = 0
 	lightLED(modeOperation)
-	os.system('omxplayer --no-osd wav/mode0.wav')	
+	#os.system('omxplayer --vol ' + speakVolume + ' --no-osd wav/mode0.wav')	
+	call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode0.wav"])
 	lightLED(9)
 else:
 	modeOperation = 1
 	modeSecutiry_starttime = time.time()
 	lightLED(modeOperation)
-	os.system('omxplayer --no-osd wav/mode1.wav')
+	#os.system('omxplayer --vol ' + speakVolume + ' --no-osd wav/mode1.wav')
+	call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode1.wav"])
 	lightLED(9)
 try:
 	while True:
@@ -605,6 +621,8 @@ try:
 				statusPIR = GPIO.input(pinPIR)		
 				adc = mcp3008.MCP3008()
 				vLight = adc.read([mcp3008.CH1])
+				lightDegree = vLight[0]
+
 				vMQ4 = adc.read([mcp3008.CH2])
 				adc.close()
 
