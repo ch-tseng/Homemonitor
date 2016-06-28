@@ -151,12 +151,16 @@ class TTSspech:
 			print Channel.get_busy()
 			print self.speakingAccu
 		
-			if(Channel.get_busy()):
-				while (Channel.get_busy()>0):
-					time.sleep( 0.05 )
-				Channel = sound.play()
-			else:
-	                        Channel = sound.play()
+			try:
+				if(Channel.get_busy()):
+					while (Channel.get_busy()>0):
+						time.sleep( 0.05 )
+					Channel = sound.play()
+				else:
+		                        Channel = sound.play()
+			except:
+				print("Unexpected error:", sys.exc_info()[0])
+				
 
 		#if(self.speakingAccu>1):
 		#	if(Channel.get_busy()):

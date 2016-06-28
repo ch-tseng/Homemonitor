@@ -332,7 +332,7 @@ def read_Weather():
 	speakString = "今天" + str(nowYear) + "年" + number2speakwords(int(nowMonth)) + "月" + number2speakwords(int(nowDay)) + "日  " + number2speakwords(int(nowHour)) + "點" + number2speakwords(int(nowMinute)) + "分  ," + nowWeather + " , " + nowUV + nowAir
 	logger.info(speakString)
 
-	speakWords(speakString, "MCHEN_Bruce", 24000, 0)
+	speakWords(speakString, "MCHEN_Bruce", 15600, 0)
 	lightLED(9)
 
 def alarmSensor(nowT, nowH, nowLight, nowGAS ):
@@ -685,17 +685,17 @@ try:
 			
 			if modeOperation==0:
 				#異常警示
-				if t>40:
+				if t>40 or vMQ4[0]>130:
 					EnvWarning(int(t), int(h),int(vMQ4[0]))
 				else:		
-					if nowHour>7 and nowHour<24:
+					if nowHour>6 and nowHour<=23:
 						if lastHourlySchedule!=nowHour:
 							lastHourlySchedule = nowHour
-							read_Sentence1()
 
 							#靜心語
 							#if nowHour==7 or nowHour==12 or nowHour==18 or nowHour==21:
 							#	read_Sentence1()
+							read_Sentence1()
 										
 							#整點報時					
 							timeTell(nowHour, nowMinute)
@@ -705,11 +705,11 @@ try:
 							
 							
 							#室外氣象
-							#if nowHour==11 or nowHour==12 or nowHour==13 or nowHour==14:
-							try:
-								read_Weather()
-							except:
-								print("Unexpected error:", sys.exc_info()[0])
+							if nowHour>6 or nowHour<19:
+								try:
+									read_Weather()
+								except:
+									print("Unexpected error:", sys.exc_info()[0])
 
 							#if nowHour==7 or nowHour==12 or nowHour==18:
 							#	playWAV("wav/news/n1.wav")	#下面為您播報重點新聞提要
@@ -722,7 +722,7 @@ try:
 			if modeOperation==1:
 				#logger.info("Enter modeOperation=1")
 				#異常警示
-				if t>40:
+				if t>40 or vMQ4[0]>130:
 					EnvWarning(int(t), int(h),int(vMQ4[0]))
 
 				#播放TV聲
