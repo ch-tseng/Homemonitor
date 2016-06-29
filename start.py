@@ -16,7 +16,12 @@ modeSecutirt_waittime = 300  # 180, 300, 600, 900 設定外出模式後. 幾秒�
 ENV_checkPeriod = 60  #幾秒要偵測一次溫溼度等環境值
 ENV_takePicture_period = 1800  #居家或外出模式下，每隔幾秒拍一次
 
+securityAuto = 1 # 半夜是否自動轉為安全模式，0為否，1為是
+securityAuto_start = 1  #開始時間(24小時制)
+securityAuto_end = 6  #結束時間(24小時制)
+
 speakVolume = "+700"  #音量大小
+
 localImageSize_w = 1296
 localImageSize_h = 972
 uploadImageSize_w = 720
@@ -610,12 +615,32 @@ try:
 			nowHour = dt[3]
 			nowMinute = dt[4]
 
-			#print("lastHourlySchedule=" + str(lastHourlySchedule) + " / nowHour=" + str(nowHour))
-
 			if lastHourlySchedule==999:
 				playWAV("wav/welcome/welcome1.wav") #您好，歡迎使用居家安全時鐘。按鈕 可切換居家或外出模式。
 				lastHourlySchedule = nowHour
-		
+
+			if securityAuto == 1:
+
+				if securityAuto_end<securityAuto_start:
+					#看看有否在區間內
+					if (nowHour>=securityAuto_start and nowHour<=23) or (nowHour>=0 and nowHour<=securityAuto_end):
+						autoChange = 1
+					else:
+						autoChange = 0
+				else:
+					if nowHour>=securityAuto_start and nowHour<=securityAuto_end:
+						autoChange = 1
+					else:
+						autoChange = 0
+
+				if autoChange == 1:
+					if modeOperation == 0:
+						btn_Security(1)
+				else:
+					if modeOperation == 1:					
+						btn_Security(0)
+
+
 			#Environment information
 			if (time.time()-ENV_lstchecktime)>ENV_checkPeriod:		
 				statusPIR = GPIO.input(pinPIR)		
