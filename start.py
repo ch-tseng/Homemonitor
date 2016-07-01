@@ -17,8 +17,8 @@ ENV_checkPeriod = 60  #幾秒要偵測一次溫溼度等環境值
 ENV_takePicture_period = 1800  #居家或外出模式下，每隔幾秒拍一次
 
 securityAuto = 0 # 半夜是否自動轉為安全模式，0為否，1為是
-securityAuto_start = 10  #開始時間(24小時制)
-securityAuto_end = 1  #結束時間(24小時制)
+securityAuto_start = 1  #開始時間(24小時制)
+securityAuto_end = 6  #結束時間(24小時制)
 
 speakVolume = "+700"  #音量大小
 
