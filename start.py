@@ -16,9 +16,9 @@ modeSecutirt_waittime = 300  # 180, 300, 600, 900 設定外出模式後. 幾秒�
 ENV_checkPeriod = 60  #幾秒要偵測一次溫溼度等環境值
 ENV_takePicture_period = 1800  #居家或外出模式下，每隔幾秒拍一次
 
-securityAuto = 1 # 半夜是否自動轉為安全模式，0為否，1為是
-securityAuto_start = 1  #開始時間(24小時制)
-securityAuto_end = 6  #結束時間(24小時制)
+securityAuto = 0 # 半夜是否自動轉為安全模式，0為否，1為是
+securityAuto_start = 10  #開始時間(24小時制)
+securityAuto_end = 1  #結束時間(24小時制)
 
 speakVolume = "+700"  #音量大小
 
@@ -136,6 +136,8 @@ lastPlayTV = time.time()  #上次播放TV聲的時闁
 
 lastPIRfounded = "" #上次PIR發現到人的時間
 lightDegree = 0  #目前燈光的照明度
+
+autoSecutiryNow = 0  #自動模式時，目前是否在設定的安全模式時間啟用內
 #===Functions===========================================================
 
 def is_json(myjson):
@@ -251,10 +253,14 @@ def lightLED(mode):
 		GPIO.output(pinLED_BLUE, GPIO.HIGH)
 		GPIO.output(pinLED_RED, GPIO.LOW)
 		GPIO.output(pinLED_YELLOW, GPIO.LOW)
-	elif mode == 6: # 拍照
+	elif mode == 2: # 自動模式
                 GPIO.output(pinLED_BLUE, GPIO.LOW)
                 GPIO.output(pinLED_RED, GPIO.HIGH)
                 GPIO.output(pinLED_YELLOW, GPIO.LOW)
+	elif mode == 6: # 拍照
+                GPIO.output(pinLED_BLUE, GPIO.LOW)
+                GPIO.output(pinLED_RED, GPIO.HIGH)
+                GPIO.output(pinLED_YELLOW, GPIO.HIGH)
 	elif mode == 7: # 說話
                 GPIO.output(pinLED_BLUE, GPIO.HIGH)
                 GPIO.output(pinLED_RED, GPIO.HIGH)
@@ -491,17 +497,29 @@ def takePicture(typePIC, subject, content):
 	send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "監測時間" + picture_date + ": " + subject, content + "\n\n 相片拍攝時間為" + picture_date)
 
 	lightLED(9)	
+
+def speakTime(hour, minute):
+	arrayWAVs = []
+
+	arrayWAVs.append("wav/number/" + str(hour) + ".wav")
+	#arrayWAVs.append("wav/hour/" + str(hour) + ".wav")
+	arrayWAVs.append("wav/clock/hour.wav")   #點
+	arrayWAVs.append("wav/number/" + str(minute) + ".wav")
+	arrayWAVs.append("wav/clock/minute.wav")   #分
+
+        for sentence in arrayWAVs:
+                playWAV(sentence)
 	
 #for Interrupts--------------------------
 def MOTION(pinPIR):
-	global lastPIRfounded, PIR_last_pictureTime, modeOperation, modeSecutiry_starttime, ENV_lastwarningtime, ENV_warning_repeat_period
+	global lastPIRfounded, PIR_last_pictureTime, modeOperation, modeSecutiry_starttime, ENV_lastwarningtime, ENV_warning_repeat_period, autoSecutiryNow
 	lightLED(modeOperation)
 	#time.sleep(3)	
 	captureTime = time.localtime()
 	lastPIRfounded = time.strftime("%Y/%m/%d %H:%M:%S", captureTime)
 
 	#print ("Security mode will start after " + str(modeSecutirt_waittime - (time.time()-modeSecutiry_starttime)))
-	if modeOperation==1 and modeSecutiry_starttime>0 and ((time.time()-modeSecutiry_starttime)>modeSecutirt_waittime):
+	if (modeOperation==1 and modeSecutiry_starttime>0 and ((time.time()-modeSecutiry_starttime)>modeSecutirt_waittime)) or (modeOperation==2 and autoSecutiryNow==1):
 		logger.info("Motion Detected!")
 		picIndex = time.strftime("%Y%m%d%H%M%S", captureTime)
 
@@ -542,24 +560,44 @@ def MOTION(pinPIR):
 				ENV_lastwarningtime = time.time()
 	lightLED(9)
 
+def change_Mode(securiityMode):
+	global modeOperation, securityAuto, modeSecutiry_starttime
+	
+	lightLED(securiityMode)
+
+	if securiityMode==0:
+		securityAuto = 0
+		modeSecutiry_starttime = 0
+		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode0.wav"])
+	elif securiityMode==1:
+		securityAuto = 0
+		modeSecutiry_starttime = time.time()
+		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode1.wav"])
+	elif securiityMode==2:
+		securityAuto = 1
+		modeSecutiry_starttime = 0
+		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode2a.wav"])
+		speakTime(securityAuto_start, 0)
+		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/to.wav"])
+		if securityAuto_end<securityAuto_end:
+			call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/nextday.wav"])
+		speakTime(securityAuto_end, 0)
+		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/activesecurity.wav"])
+
 def btn_Security(pinBTN_Security):
-	global modeOperation, modeSecutiry_starttime, btn_secutiry_lastclicktime
-	if (time.time()-btn_secutiry_lastclicktime)>5:		
+	global modeOperation, modeSecutiry_starttime, btn_secutiry_lastclicktime, securityAuto
+	if (time.time()-btn_secutiry_lastclicktime)>3:
 
 		if modeOperation == 0:
 			modeOperation = 1
-			lightLED(modeOperation)
-			modeSecutiry_starttime = time.time()
-			#playWAV("wav/mode1.wav")
-			#os.system('omxplayer --vol ' + speakVolume + ' --no-osd wav/mode1.wav')
-			call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode1.wav"])
-			
-		else:
+
+		elif modeOperation == 1:
+			modeOperation = 2
+
+		elif modeOperation == 2:
 			modeOperation = 0
-			lightLED(modeOperation)
-			modeSecutiry_starttime = 0
-			#os.system('omxplayer --vol ' + speakVolume + ' --no-osd wav/mode0.wav')
-			call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode0.wav"])
+	
+		change_Mode(modeOperation)
 
 		logger.info('Button Pressed, mode change to ' + str(modeOperation))
 		btn_secutiry_lastclicktime = time.time()
@@ -586,19 +624,17 @@ except:
         fo.write(str(modeOperation))
         fo.close()
 
-if strMode=="0":
+#回到上個按鈕模式，讓btn_Security()會自動切換到目前模式
+if strMode=="1":
 	modeOperation = 0
-	lightLED(modeOperation)
-	#os.system('omxplayer --vol ' + speakVolume + ' --no-osd wav/mode0.wav')	
-	call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode0.wav"])
-	lightLED(9)
-else:
+elif strMode=="2":
 	modeOperation = 1
-	modeSecutiry_starttime = time.time()
-	lightLED(modeOperation)
-	#os.system('omxplayer --vol ' + speakVolume + ' --no-osd wav/mode1.wav')
-	call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode1.wav"])
-	lightLED(9)
+else:
+	modeOperation = 2
+
+btn_Security(pinBTN_Security)
+
+
 try:
 	while True:
 
@@ -619,26 +655,26 @@ try:
 				playWAV("wav/welcome/welcome1.wav") #您好，歡迎使用居家安全時鐘。按鈕 可切換居家或外出模式。
 				lastHourlySchedule = nowHour
 
-			if securityAuto == 1:
+			if modeOperation == 2:
 
 				if securityAuto_end<securityAuto_start:
 					#看看有否在區間內
 					if (nowHour>=securityAuto_start and nowHour<=23) or (nowHour>=0 and nowHour<=securityAuto_end):
-						autoChange = 1
+						autoSecutiryNow = 1
 					else:
-						autoChange = 0
+						autoSecutiryNow = 0
 				else:
 					if nowHour>=securityAuto_start and nowHour<=securityAuto_end:
-						autoChange = 1
+						autoSecutiryNow = 1
 					else:
-						autoChange = 0
+						autoSecutiryNow = 0
 
-				if autoChange == 1:
-					if modeOperation == 0:
-						btn_Security(1)
-				else:
-					if modeOperation == 1:					
-						btn_Security(0)
+				#if autoChange == 1:
+				#	if modeOperation == 0:
+				#		btn_Security(1)
+				#else:
+				#	if modeOperation == 1:					
+				#		btn_Security(0)
 
 
 			#Environment information
@@ -658,6 +694,8 @@ try:
 				statusContent +=  '偵測時間：' + str(nowYear) + '/' + str(nowMonth) + '/' + str(nowDay) + ' ' + str(nowHour) + ':' + str(nowMinute)
 				if modeOperation==1:
 					statusContent +=  "\n\n 目前居家安全掛鐘處於[外出模式]"
+				if modeOperation==2:
+					statusContent +=  "\n\n 目前居家安全掛鐘處於[自動模式]"
 				else:
 					statusContent +=  "\n\n 目前居家安全掛鐘處於[居家模式]"
 
@@ -708,7 +746,7 @@ try:
 
 				ENV_lstchecktime = time.time()
 			
-			if modeOperation==0:
+			if modeOperation==0 or (autoSecutiryNow==0 and modeOperation==2):
 				#異常警示
 				if t>40 or vMQ4[0]>130:
 					EnvWarning(int(t), int(h),int(vMQ4[0]))
@@ -744,21 +782,21 @@ try:
 					takePicture("Home", "居家安全定時回報", statusContent)
 					lastENV_takePicture_period = time.time()
 						
-			if modeOperation==1:
+			if modeOperation==1 or (autoSecutiryNow==1 and modeOperation==2):
 				#logger.info("Enter modeOperation=1")
 				#異常警示
 				if t>40 or vMQ4[0]>130:
 					EnvWarning(int(t), int(h),int(vMQ4[0]))
-
-				#播放TV聲
-				if lastPlayTV!=nowHour and (nowHour==8 or nowHour==17 or nowHour==22):
-					logger.info("PLAY TV SOUND.")
-					playTV()
-					lastPlayTV = nowHour
+				if (modeSecutirt_waittime - (time.time()-modeSecutiry_starttime))/60 < 0:
+					#播放TV聲
+					if lastPlayTV!=nowHour and (nowHour==8 or nowHour==17 or nowHour==22):
+						logger.info("PLAY TV SOUND.")
+						playTV()
+						lastPlayTV = nowHour
 				
-				if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
-                                        takePicture("Home", "居家安全定時回報", statusContent)
-                                        lastENV_takePicture_period = time.time()	
+					if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
+	                                        takePicture("Home", "居家安全定時回報", statusContent)
+	                                        lastENV_takePicture_period = time.time()	
 		
 except:
 	print("Unexpected error:", sys.exc_info()[0])
