@@ -524,7 +524,7 @@ def MOTION(pinPIR):
 		picIndex = time.strftime("%Y%m%d%H%M%S", captureTime)
 
 		if ((time.time()-PIR_last_pictureTime))>PIR_sleep_PictureAgainPeriod:
-			playWAV("wav/warning/warning1.wav")
+			#playWAV("wav/warning/warning1.wav")
 
 			takePicture("PIR-"+picIndex+"-1", "PIR偵測", "PIR偵測到有人進入客廳！")			
 			time.sleep(PIR_sleep_take_2_PicturesPeriod)
@@ -535,6 +535,11 @@ def MOTION(pinPIR):
 			#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename1, picture_filename2 , picture_filename3,  "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
 
 			playWAV("wav/warning/warning1.wav")
+
+			time.sleep(PIR_sleep_take_2_PicturesPeriod)
+                        takePicture("PIR-"+picIndex+"-4", "PIR偵測", "PIR偵測到有人進入客廳！")
+			time.sleep(PIR_sleep_take_2_PicturesPeriod)
+                        takePicture("PIR-"+picIndex+"-5", "PIR偵測", "PIR偵測到有人進入客廳！")
 
 			PIR_last_pictureTime = time.time()
 			lightLED(9)
