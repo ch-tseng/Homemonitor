@@ -17,8 +17,10 @@ ENV_checkPeriod = 60  #幾秒要偵測一次溫溼度等環境值
 ENV_takePicture_period = 1800  #居家或外出模式下，每隔幾秒拍一次
 
 securityAuto = 0 # 半夜是否自動轉為安全模式，0為否，1為是
-securityAuto_start = 1  #開始時間(24小時制)
+securityAuto_start = 0  #開始時間(24小時制)
 securityAuto_end = 6  #結束時間(24小時制)
+
+msgSMS = "PIR Alert! 家中有人入侵，請注意。"
 
 speakVolume = "+700"  #音量大小
 
@@ -94,6 +96,7 @@ camera.vflip = True
 camera.crop = (0.0, 0.0, 1.0, 1.0)
 
 pinPIR = 35
+pinPIR2 = 8
 pinDHT22 = 13
 pinLED_RED = 38
 pinLED_BLUE = 36
@@ -105,6 +108,7 @@ GPIO.setmode(GPIO.BOARD)
 GPIO.setup(pinBTN_Security, GPIO.IN, pull_up_down=GPIO.PUD_UP) #使用內建的上拉電阻
 
 GPIO.setup(pinPIR ,GPIO.IN)
+GPIO.setup(pinPIR2 ,GPIO.IN)
 GPIO.setup(pinLED_RED ,GPIO.OUT)
 GPIO.setup(pinLED_YELLOW ,GPIO.OUT)
 GPIO.setup(pinLED_BLUE ,GPIO.OUT)
@@ -138,6 +142,7 @@ lastPIRfounded = "" #上次PIR發現到人的時間
 lightDegree = 0  #目前燈光的照明度
 
 autoSecutiryNow = 0  #自動模式時，目前是否在設定的安全模式時間啟用內
+
 #===Functions===========================================================
 
 def is_json(myjson):
@@ -161,6 +166,11 @@ def send_mailgun(apikey, domainName, imagefile, toEmail, ccEmail, txtSubject, tx
                         "text": txtContent
 #                       "html": "<html>HTML version of the body</html>"
                         })
+
+def sendSMS(msg):
+	return requests.post(
+		"http://data.sunplusit.com/Api/SNSMS?code=FB4A77FFA62AD06F48257C190013FB76",
+		data={ "subject": msg })
 
 def send_mailgun_multi(apikey, domainName, imagefile1, imagefile2, imagefile3, toEmail, ccEmail, txtSubject, txtContent):
 	return requests.post(
@@ -512,7 +522,7 @@ def speakTime(hour, minute):
 	
 #for Interrupts--------------------------
 def MOTION(pinPIR):
-	global lastPIRfounded, PIR_last_pictureTime, modeOperation, modeSecutiry_starttime, ENV_lastwarningtime, ENV_warning_repeat_period, autoSecutiryNow
+	global lastPIRfounded, PIR_last_pictureTime, modeOperation, modeSecutiry_starttime, ENV_lastwarningtime, ENV_warning_repeat_period, autoSecutiryNow, msgSMS
 	lightLED(modeOperation)
 	#time.sleep(3)	
 	captureTime = time.localtime()
@@ -525,6 +535,10 @@ def MOTION(pinPIR):
 
 		if ((time.time()-PIR_last_pictureTime))>PIR_sleep_PictureAgainPeriod:
 			#playWAV("wav/warning/warning1.wav")
+			#try:
+			#	sendSMS(msgSMS)
+			#except:
+			#	logger.info("Unexpected error:", sys.exc_info()[0])
 
 			takePicture("PIR-"+picIndex+"-1", "PIR偵測", "PIR偵測到有人進入客廳！")			
 			time.sleep(PIR_sleep_take_2_PicturesPeriod)
@@ -584,7 +598,7 @@ def change_Mode(securiityMode):
 		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode2a.wav"])
 		speakTime(securityAuto_start, 0)
 		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/to.wav"])
-		if securityAuto_end<securityAuto_end:
+		if securityAuto_end<securityAuto_start:
 			call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/nextday.wav"])
 		speakTime(securityAuto_end, 0)
 		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/activesecurity.wav"])
@@ -611,9 +625,15 @@ def btn_Security(pinBTN_Security):
 		fo.write(str(modeOperation))
 		fo.close()
 		lightLED(9)
+
+def motion_outdoor(pinPIR2):
+	print("PIR dectected!")
+
+
 		
 #Register----------------------------------------------
 GPIO.add_event_detect(pinPIR, GPIO.RISING, callback=MOTION)
+GPIO.add_event_detect(pinPIR2, GPIO.RISING, callback=motion_outdoor)
 #GPIO.add_event_detect(pinBTN_Security, GPIO.FALLING, callback=btn_Security)
 
 #Start--------------------------------------------------
@@ -664,12 +684,12 @@ try:
 
 				if securityAuto_end<securityAuto_start:
 					#看看有否在區間內
-					if (nowHour>=securityAuto_start and nowHour<=23) or (nowHour>=0 and nowHour<=securityAuto_end):
+					if (nowHour>=securityAuto_start and nowHour<=23) or (nowHour>=0 and nowHour<securityAuto_end):
 						autoSecutiryNow = 1
 					else:
 						autoSecutiryNow = 0
 				else:
-					if nowHour>=securityAuto_start and nowHour<=securityAuto_end:
+					if nowHour>=securityAuto_start and nowHour<securityAuto_end:
 						autoSecutiryNow = 1
 					else:
 						autoSecutiryNow = 0
@@ -695,7 +715,6 @@ try:
 				h,t = dht.read_retry(dht.DHT22, pinDHT22)
 
 				statusContent = ""
-
 				statusContent +=  '偵測時間：' + str(nowYear) + '/' + str(nowMonth) + '/' + str(nowDay) + ' ' + str(nowHour) + ':' + str(nowMinute)
 				if modeOperation==1:
 					statusContent +=  "\n\n 目前居家安全掛鐘處於[外出模式]"
@@ -717,40 +736,36 @@ try:
                                         statusContent +=  "\n 客聽為正常亮度，照度為：" + str(vLight[0])
 				elif vLight[0]>=50:
                                         statusContent +=  "\n 客聽很亮，照度為：" + str(vLight[0])
-
 				if vMQ4[0]<110:
 					statusContent +=  "\n 此外，空氣中煤氣指數為" + str(vMQ4[0]) + "，並沒有煤氣或瓦斯外洩的疑慮，請安心。"
 				elif vMQ4[0]>=110 and vMQ4[0]<130:
 					statusContent +=  "\n 此外請注意，空氣中煤氣指數為" + str(vMQ4[0]) + "，數值稍高，請注意煤氣或瓦斯是否有外洩可能。"
 				elif vMQ4[0]>=130:
                                         statusContent +=  "\n 此外，請您特別注意，空氣中煤氣指數為" + str(vMQ4[0]) + "，數值偏高，請檢查煤氣或瓦斯是否有外洩。"
-
-				if t<20:
-					statusContent +=  "\n 溫溼度方面，客聽的溫度目前為" + str(int(t)) + "度C，有點寒冷。"
-				elif t<30 and t>=20:
-					statusContent +=  "\n 溫溼度方面，客聽溫度目前為" + str(int(t)) + "度C，有些涼爽。"
-				elif t<35 and t>=30:
-	                                statusContent +=  "\n 溫溼度方面，客聽溫度目前為" + str(int(t)) + "度C，有些悶熱。"
-				elif t>=35:
-                                        statusContent +=  "\n 溫溼度方面，要請您注意，客聽溫度很高，目前為" + str(int(t)) + "度C，請檢查火燭。"
-
-				if h<10:
-					statusContent +=  "溼度是" + str(int(h)) + "%，客聽的空氣相當乾燥。"
-				elif h<30 and h>=10:
-					statusContent +=  "溼度是" + str(int(h)) + "%，客聽的空氣稍微乾燥。"
-				elif h<65 and h>=30:
-                                        statusContent +=  "溼度是" + str(int(h)) + "%，客聽的溼度在理想狀態。"
-				elif h<90 and h>=65:
-                                        statusContent +=  "溼度是" + str(int(h)) + "%，客聽的溼度偏高。"
-				elif h>=90:
-					statusContent +=  "溼度是" + str(int(h)) + "%，客聽的溼度相當高。"
-
+				if t != None:
+					if t<20:
+						statusContent +=  "\n 溫溼度方面，客聽的溫度目前為" + str(int(t)) + "度C，有點寒冷。"
+					elif t<30 and t>=20:
+						statusContent +=  "\n 溫溼度方面，客聽溫度目前為" + str(int(t)) + "度C，有些涼爽。"
+					elif t<35 and t>=30:
+		                                statusContent +=  "\n 溫溼度方面，客聽溫度目前為" + str(int(t)) + "度C，有些悶熱。"
+					elif t>=35:
+	                                        statusContent +=  "\n 溫溼度方面，要請您注意，客聽溫度很高，目前為" + str(int(t)) + "度C，請檢查火燭。"
+				if h != None:
+					if h<10:
+						statusContent +=  "溼度是" + str(int(h)) + "%，客聽的空氣相當乾燥。"
+					elif h<30 and h>=10:
+						statusContent +=  "溼度是" + str(int(h)) + "%，客聽的空氣稍微乾燥。"
+					elif h<65 and h>=30:
+	                                        statusContent +=  "溼度是" + str(int(h)) + "%，客聽的溼度在理想狀態。"
+					elif h<90 and h>=65:
+	                                        statusContent +=  "溼度是" + str(int(h)) + "%，客聽的溼度偏高。"
+					elif h>=90:
+						statusContent +=  "溼度是" + str(int(h)) + "%，客聽的溼度相當高。"
 			
 				logger.info(statusContent)
 				logger.info("-------------------------------------")
-
 				ENV_lstchecktime = time.time()
-			
 			if modeOperation==0 or (autoSecutiryNow==0 and modeOperation==2):
 				#異常警示
 				if t>40 or vMQ4[0]>130:
