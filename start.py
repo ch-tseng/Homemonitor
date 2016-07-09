@@ -13,11 +13,11 @@ PIR_sleep_take_2_PicturesPeriod = 0.5  #拍攝每張相片的間隔時間
 
 modeSecutirt_waittime = 300  # 180, 300, 600, 900 設定外出模式後. 幾秒後才會開始動作.
 #-for all mode ------------------------------
-ENV_checkPeriod = 60  #幾秒要偵測一次溫溼度等環境值
+ENV_checkPeriod = 180  #幾秒要偵測一次溫溼度等環境值
 ENV_takePicture_period = 1800  #居家或外出模式下，每隔幾秒拍一次
 
 securityAuto = 0 # 半夜是否自動轉為安全模式，0為否，1為是
-securityAuto_start = 0  #開始時間(24小時制)
+securityAuto_start = 1  #開始時間(24小時制)
 securityAuto_end = 6  #結束時間(24小時制)
 
 msgSMS = "PIR Alert! 家中有人入侵，請注意。"
@@ -467,7 +467,7 @@ def EnvWarning(T, H, MQ4):
 		if T>45:
 			txtSubject += "溫度超過45度C "
 			txtContent += "目前家中的溫度是" + T + "度C。"
-		if MQ4>30:
+		if MQ4>120:
 			txtSubject += "煤氣可能外洩 "
 			txtContent += "目前家中的煤氣指數是" + MQ4 + "。"
 				
@@ -502,6 +502,7 @@ def takePicture(typePIC, subject, content):
 	picture_filename = time.strftime("%Y%m%d%H%M%S", captureTime) + '.jpg'
 	camera.capture(picture_filename)
 	logger.info("ISO:" + str(camera.ISO) + " / LightDegree:" + str(lightDegree) + " / A picture was taken: " + picture_filename )
+	logger.info("picture_filename=" + picture_filename + " / uploadImageSize_w=" + str(uploadImageSize_w) + " / uploadImageSize_h=" + str(uploadImageSize_h) + " / typePIC=" + typePIC + " / picture_filename=" + picture_filename)
 	upload_files(picture_filename, uploadImageSize_w, uploadImageSize_h, typePIC, picture_filename)
 	#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
 	send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "監測時間" + picture_date + ": " + subject, content + "\n\n 相片拍攝時間為" + picture_date)
@@ -627,9 +628,30 @@ def btn_Security(pinBTN_Security):
 		lightLED(9)
 
 def motion_outdoor(pinPIR2):
-	print("PIR dectected!")
+	global uploadImageSize_w, uploadImageSize_h, APIKEY_MAILGUN, API_MAILGUN_DOMAIN
 
+	dt = list(time.localtime())
+	#nowYear = dt[0]
+	#nowMonth = dt[1]
+	#nowDay = dt[2]
+	nowHour = dt[3]
+	nowMinute = dt[4]
 
+	if nowHour>18:
+		lightLED(6)
+		logger.info("Outdoor PIR dectected!")
+		playWAV("wav/warning/warning2.wav")
+
+		#captureTime = time.localtime()
+	        #picture_date = time.strftime("%H點%M分%S秒", captureTime)
+		#picture_filename = time.strftime("%Y%m%d%H%M%S", captureTime) + '.jpg'
+		#call(["fswebcam","-r", "1280x720", "--no-banner",picture_filename])
+
+		#logger.info("A outdoor picture was taken: " + picture_filename )
+	        #upload_files(picture_filename, uploadImageSize_w, uploadImageSize_h, "Outdoor", picture_filename)
+	        #send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "門口有人警報：" + picture_date, "相片拍攝時間為" + picture_date)
+
+	        lightLED(9)
 		
 #Register----------------------------------------------
 GPIO.add_event_detect(pinPIR, GPIO.RISING, callback=MOTION)
@@ -658,7 +680,6 @@ else:
 	modeOperation = 2
 
 btn_Security(pinBTN_Security)
-
 
 try:
 	while True:
@@ -723,6 +744,7 @@ try:
 				else:
 					statusContent +=  "\n\n 目前居家安全掛鐘處於[居家模式]"
 
+
 				if lastPIRfounded!="":
 					statusContent +=  "\n 上次PIR偵測有人的時間：" + lastPIRfounded
 
@@ -731,17 +753,20 @@ try:
 				elif vLight[0]<15 and vLight[0]>=5:
 					statusContent +=  "\n 客聽可能未開燈，相當的暗，照度為：" + str(vLight[0])
 				elif vLight[0]<30 and vLight[0]>=15:
-					statusContent +=  "\n 客聽暗但是微亮，有些亮光，照度為：" + str(vLight[0])
+					statusContent +=  "\n 客聽稍暗，有些亮光，照度為：" + str(vLight[0])
 				elif vLight[0]<50 and vLight[0]>=30:
                                         statusContent +=  "\n 客聽為正常亮度，照度為：" + str(vLight[0])
 				elif vLight[0]>=50:
                                         statusContent +=  "\n 客聽很亮，照度為：" + str(vLight[0])
-				if vMQ4[0]<110:
+
+				if vMQ4[0]<120:
 					statusContent +=  "\n 此外，空氣中煤氣指數為" + str(vMQ4[0]) + "，並沒有煤氣或瓦斯外洩的疑慮，請安心。"
-				elif vMQ4[0]>=110 and vMQ4[0]<130:
+				elif vMQ4[0]>=120 and vMQ4[0]<130:
 					statusContent +=  "\n 此外請注意，空氣中煤氣指數為" + str(vMQ4[0]) + "，數值稍高，請注意煤氣或瓦斯是否有外洩可能。"
 				elif vMQ4[0]>=130:
                                         statusContent +=  "\n 此外，請您特別注意，空氣中煤氣指數為" + str(vMQ4[0]) + "，數值偏高，請檢查煤氣或瓦斯是否有外洩。"
+
+
 				if t != None:
 					if t<20:
 						statusContent +=  "\n 溫溼度方面，客聽的溫度目前為" + str(int(t)) + "度C，有點寒冷。"
@@ -768,7 +793,7 @@ try:
 				ENV_lstchecktime = time.time()
 			if modeOperation==0 or (autoSecutiryNow==0 and modeOperation==2):
 				#異常警示
-				if t>40 or vMQ4[0]>130:
+				if (t != None and h != None and t>40) and vMQ4[0]>120:
 					EnvWarning(int(t), int(h),int(vMQ4[0]))
 				else:		
 					if nowHour>6 and nowHour<=23:
@@ -784,8 +809,8 @@ try:
 							timeTell(nowHour, nowMinute)
 							
 							#室內溫度狀況告知					
-							alarmSensor(int(t), int(h), int(vLight[0]), int(vMQ4[0]) )
-							
+							if t != None and h != None:
+								alarmSensor(int(t), int(h), int(vLight[0]), int(vMQ4[0]) )
 							
 							#室外氣象
 							if nowHour>6 or nowHour<19:
@@ -793,7 +818,6 @@ try:
 									read_Weather()
 								except:
 									print("Unexpected error:", sys.exc_info()[0])
-
 							#if nowHour==7 or nowHour==12 or nowHour==18:
 							#	playWAV("wav/news/n1.wav")	#下面為您播報重點新聞提要
 							#	newsRead(NEWSREPORT_URL, NEWSREPORT_SPEAKER, 10)
@@ -801,11 +825,11 @@ try:
 				if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
 					takePicture("Home", "居家安全定時回報", statusContent)
 					lastENV_takePicture_period = time.time()
-						
+	
 			if modeOperation==1 or (autoSecutiryNow==1 and modeOperation==2):
 				#logger.info("Enter modeOperation=1")
 				#異常警示
-				if t>40 or vMQ4[0]>130:
+				if (t != None and h != None and t>40) and vMQ4[0]>130:
 					EnvWarning(int(t), int(h),int(vMQ4[0]))
 				if (modeSecutirt_waittime - (time.time()-modeSecutiry_starttime))/60 < 0:
 					#播放TV聲
