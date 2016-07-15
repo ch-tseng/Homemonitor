@@ -360,7 +360,7 @@ def alarmSensor(nowT, nowH, nowLight, nowGAS ):
 
 	arrayWAVs = []
 	
-	if(nowGAS>100):
+	if(nowGAS>180):
 		arrayWAVs.append("wav/sensor/w2.wav") #危險，危險！空氣中偵測到媒氣外洩，請立即開門窗並檢查家中瓦斯！
 		
 	if(nowT<=16):
@@ -467,7 +467,7 @@ def EnvWarning(T, H, MQ4):
 		if T>45:
 			txtSubject += "溫度超過45度C "
 			txtContent += "目前家中的溫度是" + T + "度C。"
-		if MQ4>120:
+		if MQ4>180:
 			txtSubject += "煤氣可能外洩 "
 			txtContent += "目前家中的煤氣指數是" + MQ4 + "。"
 				
@@ -761,10 +761,10 @@ try:
 
 				if vMQ4[0]<120:
 					statusContent +=  "\n 此外，空氣中煤氣指數為" + str(vMQ4[0]) + "，並沒有煤氣或瓦斯外洩的疑慮，請安心。"
-				elif vMQ4[0]>=120 and vMQ4[0]<130:
+				elif vMQ4[0]>=130 and vMQ4[0]<180:
 					statusContent +=  "\n 此外請注意，空氣中煤氣指數為" + str(vMQ4[0]) + "，數值稍高，請注意煤氣或瓦斯是否有外洩可能。"
-				elif vMQ4[0]>=130:
-                                        statusContent +=  "\n 此外，請您特別注意，空氣中煤氣指數為" + str(vMQ4[0]) + "，數值偏高，請檢查煤氣或瓦斯是否有外洩。"
+				elif vMQ4[0]>=180:
+                                        statusContent +=  "\n 此外，請您特別注意，空氣中煤氣指數為" + str(vMQ4[0]) + "，數值很高，請檢查煤氣或瓦斯是否有外洩。"
 
 
 				if t != None:
