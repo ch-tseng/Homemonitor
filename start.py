@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 #=======CONFIGURE============================================
-APIKEY_MAILGUN = "key-YOUR-API-KEY"
-API_MAILGUN_DOMAIN = "YOUR-DOMAIN"
+APIKEY_MAILGUN = "key-090bdff9e11f02225c3911dd68ae4666"
+API_MAILGUN_DOMAIN = "mg.appflying.net"
 
 #-for mode 1 ---------------------
 tvList = ["wav/tv/tv1.mp3", "wav/tv/tv2.mp3", "wav/tv/tv3.mp3", "wav/tv/tv4.mp3", "wav/tv/tv5.mp3", "wav/tv/tv6.mp3", "wav/tv/tv7.mp3"]
@@ -29,6 +29,7 @@ localImageSize_h = 972
 uploadImageSize_w = 720
 uploadImageSize_h = 480
 
+capturedImagePath = "/var/www/html/captured/"
 ##蘋果日報-財經總覽 "http://www.appledaily.com.tw/rss/newcreate/kind/sec/type/8"
 ##蘋果日報-頭條 "http://www.appledaily.com.tw/rss/newcreate/kind/sec/type/1077"
 ##聯合報-要聞 "http://udn.com/udnrss/BREAKINGNEWS1.xml"
@@ -153,6 +154,7 @@ def is_json(myjson):
 	return True
 
 def send_mailgun(apikey, domainName, imagefile, toEmail, ccEmail, txtSubject, txtContent):
+	logger.info("Send email, subject is: "+txtSubject)	
         return requests.post(
                 "https://api.mailgun.net/v3/"+domainName+"/messages",
                 auth=("api", apikey),
@@ -446,21 +448,21 @@ def EnvWarning(T, H, MQ4):
 	if ((time.time()-ENV_lastwarningtime))>ENV_warning_repeat_period:
 		picture_date = time.strftime("%H點%M分%S秒", captureTime)
 		picture_filename1 = time.strftime("%Y%m%d%H%M%S", captureTime) + '1.jpg'
-		camera.capture(picture_filename1)
+		camera.capture(capturedImagePath+picture_filename1)
 		time.sleep(PIR_sleep_take_2_PicturesPeriod)
-		upload_files(picture_filename1, 2048, 2048, "PIR_1", picture_filename1)
+		upload_files(capturedImagePath+picture_filename1, 2048, 2048, "PIR_1", picture_filename1)
 
 		picture_date = time.strftime("%H點%M分%S秒", captureTime)
 		picture_filename2 = time.strftime("%Y%m%d%H%M%S", captureTime) + '2.jpg'
-		camera.capture(picture_filename2)
+		camera.capture(capturedImagePath+picture_filename2)
 		time.sleep(PIR_sleep_take_2_PicturesPeriod)
-		upload_files(picture_filename2, 2048, 2048, "PIR_2", picture_filename2)
+		upload_files(capturedImagePath+picture_filename2, 2048, 2048, "PIR_2", picture_filename2)
 
 		picture_date = time.strftime("%H點%M分%S秒", captureTime)
 		picture_filename3 = time.strftime("%Y%m%d%H%M%S", captureTime) + '3.jpg'
-		camera.capture(picture_filename3)
+		camera.capture(capturedImagePath+picture_filename3)
 		time.sleep(PIR_sleep_take_2_PicturesPeriod)
-		upload_files(picture_filename3, 2048, 2048, "PIR_3", picture_filename3)
+		upload_files(capturedImagePath+picture_filename3, 2048, 2048, "PIR_3", picture_filename3)
 			
 		txtSubject = "環境警報:"
 		txtContent = ""
@@ -471,7 +473,7 @@ def EnvWarning(T, H, MQ4):
 			txtSubject += "煤氣可能外洩 "
 			txtContent += "目前家中的煤氣指數是" + MQ4 + "。"
 				
-		send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename1, picture_filename2 , picture_filename3,  "myvno@hotmail.com", "ch.tseng@sunplusit.com", txtSubject, txtContent + ", 已立即拍攝相片，時間為" + picture_date + "。")
+		send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, capturedImagePath+picture_filename1, capturedImagePath+picture_filename2 , capturedImagePath+picture_filename3,  "myvno@hotmail.com", "ch.tseng@sunplusit.com", txtSubject, txtContent + ", 已立即拍攝相片，時間為" + picture_date + "。")
 		ENV_lastwarningtime = time.time()
 
 def playTV():
@@ -500,12 +502,14 @@ def takePicture(typePIC, subject, content):
 	captureTime = time.localtime()
 	picture_date = time.strftime("%H點%M分%S秒", captureTime)
 	picture_filename = time.strftime("%Y%m%d%H%M%S", captureTime) + '.jpg'
-	camera.capture(picture_filename)
+	camera.capture(capturedImagePath+picture_filename)
 	logger.info("ISO:" + str(camera.ISO) + " / LightDegree:" + str(lightDegree) + " / A picture was taken: " + picture_filename )
 	logger.info("picture_filename=" + picture_filename + " / uploadImageSize_w=" + str(uploadImageSize_w) + " / uploadImageSize_h=" + str(uploadImageSize_h) + " / typePIC=" + typePIC + " / picture_filename=" + picture_filename)
-	upload_files(picture_filename, uploadImageSize_w, uploadImageSize_h, typePIC, picture_filename)
-	#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
-	send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "監測時間" + picture_date + ": " + subject, content + "\n\n 相片拍攝時間為" + picture_date)
+	
+	if typePIC != "Home":
+		upload_files(capturedImagePath+picture_filename, uploadImageSize_w, uploadImageSize_h, typePIC, picture_filename)
+		#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
+		send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, capturedImagePath+picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "監測時間" + picture_date + ": " + subject, content + "\n\n 相片拍攝時間為" + picture_date)
 
 	lightLED(9)	
 
@@ -544,8 +548,8 @@ def MOTION(pinPIR):
 			takePicture("PIR-"+picIndex+"-1", "PIR偵測", "PIR偵測到有人進入客廳！")			
 			time.sleep(PIR_sleep_take_2_PicturesPeriod)
 			takePicture("PIR-"+picIndex+"-2", "PIR偵測", "PIR偵測到有人進入客廳！")
-			time.sleep(PIR_sleep_take_2_PicturesPeriod)
-			takePicture("PIR-"+picIndex+"-3", "PIR偵測", "PIR偵測到有人進入客廳！")
+			#time.sleep(PIR_sleep_take_2_PicturesPeriod)
+			#takePicture("PIR-"+picIndex+"-3", "PIR偵測", "PIR偵測到有人進入客廳！")
 
 			#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename1, picture_filename2 , picture_filename3,  "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
 
@@ -553,8 +557,8 @@ def MOTION(pinPIR):
 
 			time.sleep(PIR_sleep_take_2_PicturesPeriod)
                         takePicture("PIR-"+picIndex+"-4", "PIR偵測", "PIR偵測到有人進入客廳！")
-			time.sleep(PIR_sleep_take_2_PicturesPeriod)
-                        takePicture("PIR-"+picIndex+"-5", "PIR偵測", "PIR偵測到有人進入客廳！")
+			#time.sleep(PIR_sleep_take_2_PicturesPeriod)
+                        #takePicture("PIR-"+picIndex+"-5", "PIR偵測", "PIR偵測到有人進入客廳！")
 
 			PIR_last_pictureTime = time.time()
 			lightLED(9)
@@ -813,16 +817,17 @@ try:
 								alarmSensor(int(t), int(h), int(vLight[0]), int(vMQ4[0]) )
 							
 							#室外氣象
-							if nowHour>6 or nowHour<19:
-								try:
-									read_Weather()
-								except:
-									print("Unexpected error:", sys.exc_info()[0])
+							#if nowHour>6 or nowHour<19:
+							#	try:
+							#		read_Weather()
+							#	except:
+							#		print("Unexpected error:", sys.exc_info()[0])
 							#if nowHour==7 or nowHour==12 or nowHour==18:
 							#	playWAV("wav/news/n1.wav")	#下面為您播報重點新聞提要
 							#	newsRead(NEWSREPORT_URL, NEWSREPORT_SPEAKER, 10)
 				
 				if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
+					logger.info("準備拍照-居家安全定時回報")
 					takePicture("Home", "居家安全定時回報", statusContent)
 					lastENV_takePicture_period = time.time()
 	
@@ -839,7 +844,7 @@ try:
 						lastPlayTV = nowHour
 				
 					if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
-	                                        takePicture("Home", "居家安全定時回報", statusContent)
+	                                        takePicture("Check", "居家安全定時回報", statusContent)
 	                                        lastENV_takePicture_period = time.time()	
 		
 except:
