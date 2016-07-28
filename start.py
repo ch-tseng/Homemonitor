@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 #=======CONFIGURE============================================
-APIKEY_MAILGUN = "key-090bdff9e11f02225c3911dd68ae4666"
-API_MAILGUN_DOMAIN = "mg.appflying.net"
+APIKEY_MAILGUN = "YOUR MAILGUN KEY"
+API_MAILGUN_DOMAIN = "YOUR MAILGUN DOMAIN"
 
 #-for mode 1 ---------------------
 tvList = ["wav/tv/tv1.mp3", "wav/tv/tv2.mp3", "wav/tv/tv3.mp3", "wav/tv/tv4.mp3", "wav/tv/tv5.mp3", "wav/tv/tv6.mp3", "wav/tv/tv7.mp3"]
