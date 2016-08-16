@@ -1,15 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-#=======CONFIGURE============================================
-APIKEY_MAILGUN = "YOUR MAILGUN KEY"
-API_MAILGUN_DOMAIN = "YOUR MAILGUN DOMAIN"
+import mailgunKEY
+APIKEY_MAILGUN = mailgunKEY.APIKEY_MAILGUN
+API_MAILGUN_DOMAIN = mailgunKEY.API_MAILGUN_DOMAIN
 
+#=======CONFIGURE============================================
 #-for mode 1 ---------------------
 tvList = ["wav/tv/tv1.mp3", "wav/tv/tv2.mp3", "wav/tv/tv3.mp3", "wav/tv/tv4.mp3", "wav/tv/tv5.mp3", "wav/tv/tv6.mp3", "wav/tv/tv7.mp3"]
-
+debugPrint = 0  #印出執行的段落
+logMSG = 1  #log messages
+pirRecordType = 2   # PIR的動作：0 無動作  1 拍照  2 錄影
 PIR_sleep_PictureAgainPeriod = 30  #要休息幾秒再度開始一輪的拍攝
 PIR_sleep_take_2_PicturesPeriod = 0.5  #拍攝每張相片的間隔時間
+PIR_sleep_videoAgainPeriod = 60  #隔幾秒再錄影
 
 modeSecutirt_waittime = 300  # 180, 300, 600, 900 設定外出模式後. 幾秒後才會開始動作.
 #-for all mode ------------------------------
@@ -17,7 +21,7 @@ ENV_checkPeriod = 180  #幾秒要偵測一次溫溼度等環境值
 ENV_takePicture_period = 1800  #居家或外出模式下，每隔幾秒拍一次
 
 securityAuto = 0 # 半夜是否自動轉為安全模式，0為否，1為是
-securityAuto_start = 1  #開始時間(24小時制)
+securityAuto_start = 2  #開始時間(24小時制)
 securityAuto_end = 6  #結束時間(24小時制)
 
 msgSMS = "PIR Alert! 家中有人入侵，請注意。"
@@ -67,6 +71,9 @@ import picamera
 import speechClass
 import urllib
 import json
+import pygame
+pygame.mixer.init(15200, -16, 1, 1024)
+os.system("amixer set PCM -- 100%")
 
 # Cloudinary ---------------------------
 from cloudinary.uploader import upload
@@ -124,6 +131,7 @@ logger.addHandler(hdlr)
 logger.setLevel(logging.INFO)
 
 PIR_last_pictureTime = time.time()  #上次拍攝相片時間
+PIR_last_videoTime = time.time()  #上次錄影時間
 
 ENV_warning_repeat_period = 120  #相同的警示提示音, 要間隔多少秒再提醒一次
 ENV_lastwarningtime = 0  #上次警示提示音的時間
@@ -149,12 +157,13 @@ autoSecutiryNow = 0  #自動模式時，目前是否在設定的安全模式時�
 def is_json(myjson):
 	try:
 		json_object = json.loads(myjson)
-	except ValueError, e:
+	except ValueError:
 		return False
 	return True
 
+
 def send_mailgun(apikey, domainName, imagefile, toEmail, ccEmail, txtSubject, txtContent):
-	logger.info("Send email, subject is: "+txtSubject)	
+	if logMSG==1: logger.info("Send email, subject is: "+txtSubject)	
         return requests.post(
                 "https://api.mailgun.net/v3/"+domainName+"/messages",
                 auth=("api", apikey),
@@ -246,13 +255,13 @@ def speakWords(wordsSpeak, speakerName, frequency, speed):
 	person = speechClass.TTSspech()
 
 	for newsSpeak in newsArray:
-		logger.info("(" + str(len(newsSpeak)) + ") " + newsSpeak)
+		if logMSG==1: logger.info("(" + str(len(newsSpeak)) + ") " + newsSpeak)
 		person.setWords("\"" + newsSpeak + "\"")
 		person.setSpeaker("\"" + speakerName + "\"")  # Bruce, Theresa, Angela, MCHEN_Bruce, MCHEN_Jo$
 		person.setSpeed(speed)
 
 		id = int(person.createConvertID())
-		logger.info("URL: " + person.getVoiceURL())
+		if logMSG==1: logger.info("URL: " + person.getVoiceURL())
 		if(id>0):
 			person.playVoice(frequency ,5)	
 
@@ -286,21 +295,29 @@ def lightLED(mode):
 		GPIO.output(pinLED_RED, GPIO.HIGH)
 		GPIO.output(pinLED_YELLOW, GPIO.HIGH)
 
-def playWAV(wavFile):
+def playWAV2(wavFile):
 	lightLED(7)
-	logger.info("PLAY WAV: "+wavFile)
+	if logMSG==1: logger.info("PLAY WAV: "+wavFile)
 	#call('omxplayer --no-osd ' + wavFile)
 	call(["omxplayer","--vol", speakVolume, "--no-osd",wavFile])
 	lightLED(9)
+
+def playWAV(wav_filename):
+        lightLED(7)
+	pygame.mixer.music.load(wav_filename)
+	pygame.mixer.music.play()
+	while pygame.mixer.music.get_busy() == True:
+		continue
+        lightLED(7)
 			
 #--Cloudinary--------------------------
 def dump_response(response):
-	logger.info("Upload response:")
+	if logMSG==1: logger.info("Upload response:")
 	for key in sorted(response.keys()):
-		logger.info("  %s: %s" % (key, response[key]))
+		if logMSG==1: logger.info("  %s: %s" % (key, response[key]))
 
 def upload_files(filename, width, height, tag, pid):
-	logger.info("--- Upload a local file with custom public ID")
+	if logMSG==1: logger.info("--- Upload a local file with custom public ID")
 	response = upload(filename,
 		tags = tag,
 		public_id = pid,
@@ -313,13 +330,13 @@ def upload_files(filename, width, height, tag, pid):
 		height = height,
 		crop = "fit"
 	)
-	logger.info("Image uploaded to url: " + url)
+	if logMSG==1: logger.info("Image uploaded to url: " + url)
 	
 #--Actions------------------------------
 def read_Sentence1():  #靜心語
 	wavNumber = str(random.randint(1, 80))
-	playWAV("wav/sentence1/start.wav")
-	playWAV("wav/sentence1/"+wavNumber+".wav")	
+	playWAV("wav/sentence1/start.mp3")
+	playWAV("wav/sentence1/"+wavNumber+".mp3")	
 
 
 def read_Weather():
@@ -353,7 +370,7 @@ def read_Weather():
 	nowAir = nowAir_tmp.replace("為", "是 ")
 	
 	speakString = "今天" + str(nowYear) + "年" + number2speakwords(int(nowMonth)) + "月" + number2speakwords(int(nowDay)) + "日  " + number2speakwords(int(nowHour)) + "點" + number2speakwords(int(nowMinute)) + "分  ," + nowWeather + " , " + nowUV + nowAir
-	logger.info(speakString)
+	if logMSG==1: logger.info(speakString)
 
 	speakWords(speakString, "MCHEN_Bruce", 15600, 0)
 	lightLED(9)
@@ -363,44 +380,44 @@ def alarmSensor(nowT, nowH, nowLight, nowGAS ):
 	arrayWAVs = []
 	
 	if(nowGAS>180):
-		arrayWAVs.append("wav/sensor/w2.wav") #危險，危險！空氣中偵測到媒氣外洩，請立即開門窗並檢查家中瓦斯！
+		arrayWAVs.append("wav/sensor/w2.mp3") #危險，危險！空氣中偵測到媒氣外洩，請立即開門窗並檢查家中瓦斯！
 		
 	if(nowT<=16):
 		#sensorAlarm+="現在室內氣溫為" + str(nowT) + "度，相當寒冷，建議您一定要多穿衣服保暖。"
-		arrayWAVs.append("wav/sensor/w3.wav")  #現在室內氣溫為
-		arrayWAVs.append("wav/number/" + str(nowT) + ".wav")
-		arrayWAVs.append("wav/sensor/unitc.wav")   #度C
-		arrayWAVs.append("wav/sensor/w4.wav")  #建議您一定要多穿衣服保暖。
+		arrayWAVs.append("wav/sensor/w3.mp3")  #現在室內氣溫為
+		arrayWAVs.append("wav/number/" + str(nowT) + ".mp3")
+		arrayWAVs.append("wav/sensor/unitc.mp3")   #度C
+		arrayWAVs.append("wav/sensor/w4.mp3")  #建議您一定要多穿衣服保暖。
 	elif(nowT<=22 and nowT>16):
 		#sensorAlarm+="現在室內氣溫為" + str(nowT) + "度，有些寒冷，建議您可以多穿件衣服保暖，以免感冒了。"
-		arrayWAVs.append("wav/sensor/w3.wav")  #現在室內氣溫為
-		arrayWAVs.append("wav/number/" + str(nowT) + ".wav")
-		arrayWAVs.append("wav/sensor/unitc.wav")   #度C
-		arrayWAVs.append("wav/sensor/w5.wav")  #有些寒冷，建議您可以多穿件衣服保暖，以免感冒了。
+		arrayWAVs.append("wav/sensor/w3.mp3")  #現在室內氣溫為
+		arrayWAVs.append("wav/number/" + str(nowT) + ".mp3")
+		arrayWAVs.append("wav/sensor/unitc.mp3")   #度C
+		arrayWAVs.append("wav/sensor/w5.mp3")  #有些寒冷，建議您可以多穿件衣服保暖，以免感冒了。
 	elif(nowT<=30 and nowT>25):
 		#sensorAlarm+="現在室內氣溫為" + str(nowT) + "度，氣溫剛剛好，相當舒適。"
-		arrayWAVs.append("wav/sensor/w3.wav")  #現在室內氣溫為
-		arrayWAVs.append("wav/number/" + str(nowT) + ".wav")
-		arrayWAVs.append("wav/sensor/unitc.wav")   #度C
-		arrayWAVs.append("wav/sensor/w6.wav")  #氣溫剛剛好，相當舒適。
+		arrayWAVs.append("wav/sensor/w3.mp3")  #現在室內氣溫為
+		arrayWAVs.append("wav/number/" + str(nowT) + ".mp3")
+		arrayWAVs.append("wav/sensor/unitc.mp3")   #度C
+		arrayWAVs.append("wav/sensor/w6.mp3")  #氣溫剛剛好，相當舒適。
 	elif(nowT<=35 and nowT>30):
 		#sensorAlarm+="現在室內氣溫為" + str(nowT) + "度，感覺有些悶熱，建議您可開啟空調冷氣來降低室溫。"
-		arrayWAVs.append("wav/sensor/w3.wav")  #現在室內氣溫為
-		arrayWAVs.append("wav/number/" + str(nowT) + ".wav")
-		arrayWAVs.append("wav/sensor/unitc.wav")   #度C
-		arrayWAVs.append("wav/sensor/w7.wav")  #感覺有些悶熱，建議您可開啟空調冷氣來降低室溫。
+		arrayWAVs.append("wav/sensor/w3.mp3")  #現在室內氣溫為
+		arrayWAVs.append("wav/number/" + str(nowT) + ".mp3")
+		arrayWAVs.append("wav/sensor/unitc.mp3")   #度C
+		arrayWAVs.append("wav/sensor/w7.mp3")  #感覺有些悶熱，建議您可開啟空調冷氣來降低室溫。
 	elif(nowT<=40 and nowT>35):
 		#sensorAlarm+="現在室內氣溫異常悶熱，已經" + str(nowT) + "度了，請立即檢查您的空調及冷氣系統。"
-		arrayWAVs.append("wav/sensor/w8.wav")  #現在室內氣溫異常悶熱，已經有
-		arrayWAVs.append("wav/number/" + str(nowT) + ".wav")
-		arrayWAVs.append("wav/sensor/unitc.wav")   #度C
-		arrayWAVs.append("wav/sensor/w9.wav")  #度了，請立即檢查您的空調及冷氣系統。
+		arrayWAVs.append("wav/sensor/w8.mp3")  #現在室內氣溫異常悶熱，已經有
+		arrayWAVs.append("wav/number/" + str(nowT) + ".mp3")
+		arrayWAVs.append("wav/sensor/unitc.mp3")   #度C
+		arrayWAVs.append("wav/sensor/w9.mp3")  #度了，請立即檢查您的空調及冷氣系統。
 	elif(nowT>40):
 		#sensorAlarm+="危險，危險！現在室內溫度高達" + str(nowT) + "度，已經超過常人可忍受的溫度警戒值，可能有火災發生，請注意安全。"
-		arrayWAVs.append("wav/sensor/w10.wav")  #危險，危險！現在室內溫度高達
-		arrayWAVs.append("wav/number/" + str(nowT) + ".wav")
-		arrayWAVs.append("wav/sensor/unitc.wav")   #度C
-		arrayWAVs.append("wav/sensor/w11.wav")	#已經超過常人可忍受的溫度警戒值，可能有火災發生，請檢查家中火源並注意安全。
+		arrayWAVs.append("wav/sensor/w10.mp3")  #危險，危險！現在室內溫度高達
+		arrayWAVs.append("wav/number/" + str(nowT) + ".mp3")
+		arrayWAVs.append("wav/sensor/unitc.mp3")   #度C
+		arrayWAVs.append("wav/sensor/w11.mp3")	#已經超過常人可忍受的溫度警戒值，可能有火災發生，請檢查家中火源並注意安全。
 	
 	for sentence in arrayWAVs:
 		playWAV(sentence)
@@ -408,20 +425,20 @@ def alarmSensor(nowT, nowH, nowLight, nowGAS ):
 	arrayWAVs = []
 	
 	if(nowH<=30):
-		arrayWAVs.append("wav/sensor/w20.wav")  #溼度則是
-		arrayWAVs.append("wav/number/" + str(nowH) + ".wav")
-		arrayWAVs.append("wav/sensor/unitpercent.wav")   #%
-		arrayWAVs.append("wav/sensor/w21.wav")  #空氣比較乾燥
+		arrayWAVs.append("wav/sensor/w20.mp3")  #溼度則是
+		arrayWAVs.append("wav/number/" + str(nowH) + ".mp3")
+		arrayWAVs.append("wav/sensor/unitpercent.mp3")   #%
+		arrayWAVs.append("wav/sensor/w21.mp3")  #空氣比較乾燥
 	elif(nowH<=75 and nowH>30):
-		arrayWAVs.append("wav/sensor/w20.wav")  #溼度則是
-		arrayWAVs.append("wav/number/" + str(nowH) + ".wav")
-		arrayWAVs.append("wav/sensor/unitpercent.wav")   #%
-		arrayWAVs.append("wav/sensor/w22.wav")  #溼度正常相當舒服
+		arrayWAVs.append("wav/sensor/w20.mp3")  #溼度則是
+		arrayWAVs.append("wav/number/" + str(nowH) + ".mp3")
+		arrayWAVs.append("wav/sensor/unitpercent.mp3")   #%
+		arrayWAVs.append("wav/sensor/w22.mp3")  #溼度正常相當舒服
 	elif(nowH>75):
-		arrayWAVs.append("wav/sensor/w20.wav")  #溼度則是
-		arrayWAVs.append("wav/number/" + str(nowH) + ".wav")
-		arrayWAVs.append("wav/sensor/unitpercent.wav")   #%
-		arrayWAVs.append("wav/sensor/w23.wav")  #室內空氣很潮溼哦, 請考慮是否打開除潮機
+		arrayWAVs.append("wav/sensor/w20.mp3")  #溼度則是
+		arrayWAVs.append("wav/number/" + str(nowH) + ".mp3")
+		arrayWAVs.append("wav/sensor/unitpercent.mp3")   #%
+		arrayWAVs.append("wav/sensor/w23.mp3")  #室內空氣很潮溼哦, 請考慮是否打開除潮機
 		
 	for sentence in arrayWAVs:
 		playWAV(sentence)
@@ -429,12 +446,12 @@ def alarmSensor(nowT, nowH, nowLight, nowGAS ):
 def timeTell(hour, minute):
 	arrayWAVs = []
 	
-	arrayWAVs.append("wav/clock/c1.wav")	#目前時刻
-	#arrayWAVs.append("wav/number/" + str(hour) + ".wav")
-	arrayWAVs.append("wav/hour/" + str(hour) + ".wav")
-	#arrayWAVs.append("wav/clock/hour.wav")   #點
-	#arrayWAVs.append("wav/number/" + str(minute) + ".wav")
-	#arrayWAVs.append("wav/clock/minute.wav")   #分
+	arrayWAVs.append("wav/clock/c1.mp3")	#目前時刻
+	#arrayWAVs.append("wav/number/" + str(hour) + ".mp3")
+	arrayWAVs.append("wav/hour/" + str(hour) + ".mp3")
+	#arrayWAVs.append("wav/clock/hour.mp3")   #點
+	#arrayWAVs.append("wav/number/" + str(minute) + ".mp3")
+	#arrayWAVs.append("wav/clock/minute.mp3")   #分
 
 	for sentence in arrayWAVs:
 		playWAV(sentence)
@@ -442,7 +459,7 @@ def timeTell(hour, minute):
 def EnvWarning(T, H, MQ4):
 	global modeOperation, ENV_lastwarningtime, ENV_warning_repeat_period
 
-	logger.info("Environment warning!")
+	if logMSG==1: logger.info("Environment warning!")
 	captureTime = time.localtime()
 
 	if ((time.time()-ENV_lastwarningtime))>ENV_warning_repeat_period:
@@ -479,7 +496,7 @@ def EnvWarning(T, H, MQ4):
 def playTV():
 	lightLED(7)
 	tvfile = random.choice(tvList)
-        logger.info("PLAY TV FileV: "+tvfile)
+        if logMSG==1: logger.info("PLAY TV FileV: "+tvfile)
         #call('omxplayer --no-osd ' + wavFile)
         call(["omxplayer","--vol",speakVolume,"--no-osd",tvfile])
 	lightLED(9)
@@ -503,83 +520,97 @@ def takePicture(typePIC, subject, content):
 	picture_date = time.strftime("%H點%M分%S秒", captureTime)
 	picture_filename = time.strftime("%Y%m%d%H%M%S", captureTime) + '.jpg'
 	camera.capture(capturedImagePath+picture_filename)
-	logger.info("ISO:" + str(camera.ISO) + " / LightDegree:" + str(lightDegree) + " / A picture was taken: " + picture_filename )
-	logger.info("picture_filename=" + picture_filename + " / uploadImageSize_w=" + str(uploadImageSize_w) + " / uploadImageSize_h=" + str(uploadImageSize_h) + " / typePIC=" + typePIC + " / picture_filename=" + picture_filename)
+	if logMSG==1: logger.info("ISO:" + str(camera.ISO) + " / LightDegree:" + str(lightDegree) + " / A picture was taken: " + picture_filename )
+	if logMSG==1: logger.info("picture_filename=" + picture_filename + " / uploadImageSize_w=" + str(uploadImageSize_w) + " / uploadImageSize_h=" + str(uploadImageSize_h) + " / typePIC=" + typePIC + " / picture_filename=" + picture_filename)
 	
 	if typePIC != "Home":
 		upload_files(capturedImagePath+picture_filename, uploadImageSize_w, uploadImageSize_h, typePIC, picture_filename)
 		#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
-		send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, capturedImagePath+picture_filename, "myvno@hotmail.com", "ch.tseng@sunplusit.com", "監測時間" + picture_date + ": " + subject, content + "\n\n 相片拍攝時間為" + picture_date)
+		send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, capturedImagePath+picture_filename, "myvno@hotmail.com",\
+			"ch.tseng@sunplusit.com", "監測時間" + picture_date + ": " + subject, content + "\n\n 相片拍攝時間為" + picture_date)
 
 	lightLED(9)	
 
 def speakTime(hour, minute):
 	arrayWAVs = []
 
-	arrayWAVs.append("wav/number/" + str(hour) + ".wav")
-	#arrayWAVs.append("wav/hour/" + str(hour) + ".wav")
-	arrayWAVs.append("wav/clock/hour.wav")   #點
-	arrayWAVs.append("wav/number/" + str(minute) + ".wav")
-	arrayWAVs.append("wav/clock/minute.wav")   #分
+	arrayWAVs.append("wav/number/" + str(hour) + ".mp3")
+	#arrayWAVs.append("wav/hour/" + str(hour) + ".mp3")
+	arrayWAVs.append("wav/clock/hour.mp3")   #點
+	arrayWAVs.append("wav/number/" + str(minute) + ".mp3")
+	arrayWAVs.append("wav/clock/minute.mp3")   #分
 
         for sentence in arrayWAVs:
                 playWAV(sentence)
 	
 #for Interrupts--------------------------
 def MOTION(pinPIR):
-	global lastPIRfounded, PIR_last_pictureTime, modeOperation, modeSecutiry_starttime, ENV_lastwarningtime, ENV_warning_repeat_period, autoSecutiryNow, msgSMS
+	global lastPIRfounded, PIR_last_pictureTime, modeOperation, PIR_sleep_videoAgainPeriod, PIR_last_videoTime, modeSecutiry_starttime, ENV_lastwarningtime, ENV_warning_repeat_period, autoSecutiryNow, msgSMS, APIKEY_MAILGUN, API_MAILGUN_DOMAIN, capturedImagePath
 	lightLED(modeOperation)
 	#time.sleep(3)	
 	captureTime = time.localtime()
 	lastPIRfounded = time.strftime("%Y/%m/%d %H:%M:%S", captureTime)
 
-	#print ("Security mode will start after " + str(modeSecutirt_waittime - (time.time()-modeSecutiry_starttime)))
 	if (modeOperation==1 and modeSecutiry_starttime>0 and ((time.time()-modeSecutiry_starttime)>modeSecutirt_waittime)) or (modeOperation==2 and autoSecutiryNow==1):
-		logger.info("Motion Detected!")
-		picIndex = time.strftime("%Y%m%d%H%M%S", captureTime)
+		if logMSG==1: logger.info("Motion Detected!")
 
-		if ((time.time()-PIR_last_pictureTime))>PIR_sleep_PictureAgainPeriod:
-			#playWAV("wav/warning/warning1.wav")
-			#try:
-			#	sendSMS(msgSMS)
-			#except:
-			#	logger.info("Unexpected error:", sys.exc_info()[0])
+		if pirRecordType == 1:
+			picIndex = time.strftime("%Y%m%d%H%M%S", captureTime)
 
-			takePicture("PIR-"+picIndex+"-1", "PIR偵測", "PIR偵測到有人進入客廳！")			
-			time.sleep(PIR_sleep_take_2_PicturesPeriod)
-			takePicture("PIR-"+picIndex+"-2", "PIR偵測", "PIR偵測到有人進入客廳！")
-			#time.sleep(PIR_sleep_take_2_PicturesPeriod)
-			#takePicture("PIR-"+picIndex+"-3", "PIR偵測", "PIR偵測到有人進入客廳！")
+			if ((time.time()-PIR_last_pictureTime))>PIR_sleep_PictureAgainPeriod:
+				#playWAV("wav/warning/warning1.mp3")
+				try:
+					sendSMS(msgSMS)
+				except:
+					if logMSG==1: logger.info("Unexpected error:", sys.exc_info()[0])
+	
+				takePicture("PIR-"+picIndex+"-1", "PIR偵測", "PIR偵測到有人進入客廳！")			
+				time.sleep(PIR_sleep_take_2_PicturesPeriod)
+				takePicture("PIR-"+picIndex+"-2", "PIR偵測", "PIR偵測到有人進入客廳！")
+				#time.sleep(PIR_sleep_take_2_PicturesPeriod)
+				#takePicture("PIR-"+picIndex+"-3", "PIR偵測", "PIR偵測到有人進入客廳！")
+	
+				#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename1, picture_filename2 , picture_filename3,  "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
+	
+				playWAV("wav/warning/warning1.mp3")
+	
+				time.sleep(PIR_sleep_take_2_PicturesPeriod)
+	                        takePicture("PIR-"+picIndex+"-4", "PIR偵測", "PIR偵測到有人進入客廳！")
+				#time.sleep(PIR_sleep_take_2_PicturesPeriod)
+	                        #takePicture("PIR-"+picIndex+"-5", "PIR偵測", "PIR偵測到有人進入客廳！")
+	
+				PIR_last_pictureTime = time.time()
+				lightLED(9)
 
-			#send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, picture_filename1, picture_filename2 , picture_filename3,  "myvno@hotmail.com", "ch.tseng@sunplusit.com", "PIR警報：有人入侵 " + picture_date, "PIR偵測到有人進入客廳, 已立即拍攝相片，時間為" + picture_date + "。")
-
-			playWAV("wav/warning/warning1.wav")
-
-			time.sleep(PIR_sleep_take_2_PicturesPeriod)
-                        takePicture("PIR-"+picIndex+"-4", "PIR偵測", "PIR偵測到有人進入客廳！")
-			#time.sleep(PIR_sleep_take_2_PicturesPeriod)
-                        #takePicture("PIR-"+picIndex+"-5", "PIR偵測", "PIR偵測到有人進入客廳！")
-
-			PIR_last_pictureTime = time.time()
-			lightLED(9)
+		elif pirRecordType == 2:
+			if ((time.time()-PIR_last_videoTime))>PIR_sleep_videoAgainPeriod:
+				videoFile = capturedImagePath+'pir.h264'
+				camera.resolution = (640, 480)
+				camera.start_recording(videoFile)
+				camera.wait_recording(60)
+				camera.stop_recording()
+				send_mailgun(APIKEY_MAILGUN, API_MAILGUN_DOMAIN, videoFile, "myvno@hotmail.com",\
+					"ch.tseng@sunplusit.com", "監測時間" + lastPIRfounded + ": 家中有人入侵" , "錄影時間為" + lastPIRfounded)
+				PIR_last_videoTime = time.time()
+				lightLED(9)
 	else:
 		if modeOperation==1:
 			if ((time.time()-ENV_lastwarningtime))>ENV_warning_repeat_period:
 				tmpTime = (modeSecutirt_waittime - (time.time()-modeSecutiry_starttime))/60
-				logger.info("In TIME: " + str(tmpTime) )
+				if logMSG==1: logger.info("In TIME: " + str(tmpTime) )
 
 				if tmpTime<=1:
-					playWAV("wav/startIn1min.wav")
+					playWAV("wav/startIn1min.mp3")
 				elif tmpTime<=3 and tmpTime>1:
-					playWAV("wav/startIn3min.wav")
+					playWAV("wav/startIn3min.mp3")
 				elif tmpTime<=5 and tmpTime>3:
-					playWAV("wav/startIn5min.wav")
+					playWAV("wav/startIn5min.mp3")
 				elif tmpTime<=10 and tmpTime>5:
-					playWAV("wav/startIn10min.wav")
+					playWAV("wav/startIn10min.mp3")
 				elif tmpTime<=30 and tmpTime>10:
-					playWAV("wav/startIn30min.wav")
+					playWAV("wav/startIn30min.mp3")
 				elif tmpTime>30:
-					playWAV("wav/startAfter30min.wav")
+					playWAV("wav/startAfter30min.mp3")
 
 				ENV_lastwarningtime = time.time()
 	lightLED(9)
@@ -592,21 +623,21 @@ def change_Mode(securiityMode):
 	if securiityMode==0:
 		securityAuto = 0
 		modeSecutiry_starttime = 0
-		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode0.wav"])
+		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode0.mp3"])
 	elif securiityMode==1:
 		securityAuto = 0
 		modeSecutiry_starttime = time.time()
-		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode1.wav"])
+		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode1.mp3"])
 	elif securiityMode==2:
 		securityAuto = 1
 		modeSecutiry_starttime = 0
-		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode2a.wav"])
+		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/mode2a.mp3"])
 		speakTime(securityAuto_start, 0)
-		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/to.wav"])
+		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/to.mp3"])
 		if securityAuto_end<securityAuto_start:
-			call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/nextday.wav"])
+			call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/nextday.mp3"])
 		speakTime(securityAuto_end, 0)
-		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/activesecurity.wav"])
+		call(["omxplayer","--vol",speakVolume,"--no-osd", "wav/activesecurity.mp3"])
 
 def btn_Security(pinBTN_Security):
 	global modeOperation, modeSecutiry_starttime, btn_secutiry_lastclicktime, securityAuto
@@ -623,7 +654,7 @@ def btn_Security(pinBTN_Security):
 	
 		change_Mode(modeOperation)
 
-		logger.info('Button Pressed, mode change to ' + str(modeOperation))
+		if logMSG==1: logger.info('Button Pressed, mode change to ' + str(modeOperation))
 		btn_secutiry_lastclicktime = time.time()
 
 		fo = open("finalStatus", "wb")
@@ -636,15 +667,15 @@ def motion_outdoor(pinPIR2):
 
 	dt = list(time.localtime())
 	#nowYear = dt[0]
-	#nowMonth = dt[1]
+	nowMonth = dt[1]
 	#nowDay = dt[2]
 	nowHour = dt[3]
 	nowMinute = dt[4]
 
-	if nowHour>18:
+	if (nowMonth>=5 and nowMonth<=10 and nowHour>18) or (((nowMonth>=1 and nowMonth<=4) or (nowMonth>=11 and nowMonth<=12)) and nowHour>18):
 		lightLED(6)
-		logger.info("Outdoor PIR dectected!")
-		playWAV("wav/warning/warning2.wav")
+		if logMSG==1: logger.info("Outdoor PIR dectected!")
+		playWAV("wav/warning/warning2.mp3")
 
 		#captureTime = time.localtime()
 	        #picture_date = time.strftime("%H點%M分%S秒", captureTime)
@@ -669,7 +700,7 @@ try:
 	fo = open("finalStatus", "r+")
 	strMode = fo.read()
 	fo.close()
-	logger.info("Status read from the file : " + strMode)
+	if logMSG==1: logger.info("Status read from the file : " + strMode)
 except:
 	fo = open("finalStatus", "wb")
         fo.write(str(modeOperation))
@@ -685,10 +716,10 @@ else:
 
 btn_Security(pinBTN_Security)
 
+#sendSMS("測試簡訊!")
+
 try:
 	while True:
-
-		#print "PIR:" + str(GPIO.input(pinPIR))
 
 		if GPIO.input(pinBTN_Security) == False:
 			btn_Security(pinPIR)
@@ -702,11 +733,11 @@ try:
 			nowMinute = dt[4]
 
 			if lastHourlySchedule==999:
-				playWAV("wav/welcome/welcome1.wav") #您好，歡迎使用居家安全時鐘。按鈕 可切換居家或外出模式。
+				playWAV("wav/welcome/welcome1.mp3") #您好，歡迎使用居家安全時鐘。按鈕 可切換居家或外出模式。
 				lastHourlySchedule = nowHour
-
+			if debugPrint==1: print("[A.1]")
 			if modeOperation == 2:
-
+				if debugPrint==1: print("[B.1]")
 				if securityAuto_end<securityAuto_start:
 					#看看有否在區間內
 					if (nowHour>=securityAuto_start and nowHour<=23) or (nowHour>=0 and nowHour<securityAuto_end):
@@ -719,26 +750,24 @@ try:
 					else:
 						autoSecutiryNow = 0
 
-				#if autoChange == 1:
-				#	if modeOperation == 0:
-				#		btn_Security(1)
-				#else:
-				#	if modeOperation == 1:					
-				#		btn_Security(0)
-
 
 			#Environment information
+			if debugPrint==1: print("[A.2]")
 			if (time.time()-ENV_lstchecktime)>ENV_checkPeriod:		
+				if debugPrint==1: print("[B.2]")
 				statusPIR = GPIO.input(pinPIR)		
+				if debugPrint==1: print("[C.0]")
 				adc = mcp3008.MCP3008()
+				if debugPrint==1: print("[C.0.1]")
 				vLight = adc.read([mcp3008.CH1])
+				if debugPrint==1: print("[C.0.2]")
 				lightDegree = vLight[0]
-
+				if debugPrint==1: print("[C.1]")
 				vMQ4 = adc.read([mcp3008.CH2])
 				adc.close()
-
+				if debugPrint==1: print("[C.2]")
 				h,t = dht.read_retry(dht.DHT22, pinDHT22)
-
+				if debugPrint==1: print("[C.3]")
 				statusContent = ""
 				statusContent +=  '偵測時間：' + str(nowYear) + '/' + str(nowMonth) + '/' + str(nowDay) + ' ' + str(nowHour) + ':' + str(nowMinute)
 				if modeOperation==1:
@@ -792,10 +821,12 @@ try:
 					elif h>=90:
 						statusContent +=  "溼度是" + str(int(h)) + "%，客聽的溼度相當高。"
 			
-				logger.info(statusContent)
-				logger.info("-------------------------------------")
+				if logMSG==1: logger.info(statusContent)
+				if logMSG==1: logger.info("-------------------------------------")
 				ENV_lstchecktime = time.time()
+			if debugPrint==1: print("[A.3]")
 			if modeOperation==0 or (autoSecutiryNow==0 and modeOperation==2):
+				if debugPrint==1: print("[B.3]")
 				#異常警示
 				if (t != None and h != None and t>40) and vMQ4[0]>120:
 					EnvWarning(int(t), int(h),int(vMQ4[0]))
@@ -823,15 +854,17 @@ try:
 							#	except:
 							#		print("Unexpected error:", sys.exc_info()[0])
 							#if nowHour==7 or nowHour==12 or nowHour==18:
-							#	playWAV("wav/news/n1.wav")	#下面為您播報重點新聞提要
+							#	playWAV("wav/news/n1.mp3")	#下面為您播報重點新聞提要
 							#	newsRead(NEWSREPORT_URL, NEWSREPORT_SPEAKER, 10)
 				
 				if time.time() - lastENV_takePicture_period > ENV_takePicture_period:
-					logger.info("準備拍照-居家安全定時回報")
+					if logMSG==1: logger.info("準備拍照-居家安全定時回報")
 					takePicture("Home", "居家安全定時回報", statusContent)
 					lastENV_takePicture_period = time.time()
 	
+			if debugPrint==1: print("[A.4]")
 			if modeOperation==1 or (autoSecutiryNow==1 and modeOperation==2):
+				if debugPrint==1: print("[B.4]")
 				#logger.info("Enter modeOperation=1")
 				#異常警示
 				if (t != None and h != None and t>40) and vMQ4[0]>130:
@@ -839,7 +872,7 @@ try:
 				if (modeSecutirt_waittime - (time.time()-modeSecutiry_starttime))/60 < 0:
 					#播放TV聲
 					if lastPlayTV!=nowHour and (nowHour==8 or nowHour==17 or nowHour==22):
-						logger.info("PLAY TV SOUND.")
+						if logMSG==1: logger.info("PLAY TV SOUND.")
 						playTV()
 						lastPlayTV = nowHour
 				
@@ -848,6 +881,7 @@ try:
 	                                        lastENV_takePicture_period = time.time()	
 		
 except:
-	print("Unexpected error:", sys.exc_info()[0])
-	logger.info("Unexpected error:", sys.exc_info()[0])
+        sendSMS("錯誤：" + sys.exc_info()[0])
+	if debugPrint==1: print("Unexpected error:", sys.exc_info()[0])
+	if logMSG==1: logger.info("Unexpected error:", sys.exc_info()[0])
 	#raise
